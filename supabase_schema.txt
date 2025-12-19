@@ -1,0 +1,126 @@
+create extension if not exists "pgcrypto";
+
+create table if not exists public.program (
+  id uuid primary key default gen_random_uuid(),
+  trainee_user_id uuid not null references auth.users(id) on delete cascade,
+  created_by_user_id uuid not null references auth.users(id) on delete restrict,
+
+  name text not null,
+  notes text,
+
+  start_date date,
+  end_date date,
+
+  created_at timestamptz not null default now(),
+
+  constraint program_dates_ok check (
+    end_date is null or start_date is null or end_date >= start_date
+  )
+);
+
+create index if not exists program_trainee_idx on public.program (trainee_user_id);
+create index if not exists program_created_at_idx on public.program (created_at desc);
+
+
+create table if not exists public.program_coach (
+  id uuid primary key default gen_random_uuid(),
+
+  program_id uuid not null references public.program(id) on delete cascade,
+  coach_user_id uuid not null references auth.users(id) on delete cascade,
+
+  can_edit boolean not null default false,
+  created_at timestamptz not null default now(),
+
+  constraint program_coach_unique unique (program_id, coach_user_id)
+);
+
+create index if not exists program_coach_program_idx on public.program_coach (program_id);
+create index if not exists program_coach_coach_idx on public.program_coach (coach_user_id);
+
+
+create table if not exists public.workout (
+  id uuid primary key default gen_random_uuid(),
+
+  program_id uuid not null references public.program(id) on delete cascade,
+
+  name text not null,
+  notes text,
+
+  scheduled_date date,
+  is_complete boolean not null default false,
+
+  created_at timestamptz not null default now()
+);
+
+create index if not exists workout_program_idx on public.workout (program_id);
+create index if not exists workout_program_scheduled_idx on public.workout (program_id, scheduled_date);
+create index if not exists workout_program_complete_idx on public.workout (program_id, is_complete);
+
+
+create table if not exists public.exercise (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  description text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.modifier (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  description text,
+  created_at timestamptz not null default now()
+);
+
+
+create table if not exists public.workout_exercise (
+  id uuid primary key default gen_random_uuid(),
+
+  workout_id uuid not null references public.workout(id) on delete cascade,
+  exercise_id uuid not null references public.exercise(id) on delete restrict,
+
+  "order" int not null default 0 check ("order" >= 0),
+  notes text,
+
+  created_at timestamptz not null default now()
+);
+
+create index if not exists workout_exercise_workout_idx on public.workout_exercise (workout_id);
+create index if not exists workout_exercise_workout_order_idx on public.workout_exercise (workout_id, "order");
+
+
+create table if not exists public.workout_exercise_modifier (
+  workout_exercise_id uuid not null references public.workout_exercise(id) on delete cascade,
+  modifier_id uuid not null references public.modifier(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  primary key (workout_exercise_id, modifier_id)
+);
+
+create table if not exists public.workout_set (
+  id uuid primary key default gen_random_uuid(),
+
+  workout_exercise_id uuid not null references public.workout_exercise(id) on delete cascade,
+  set_index int not null check (set_index >= 0),
+
+  reps int check (reps is null or reps >= 0),
+  weight_value numeric check (weight_value is null or weight_value >= 0),
+  weight_unit text check (weight_unit is null or weight_unit in ('kg','lb')),
+
+  rpe numeric check (rpe is null or (rpe >= 0 and rpe <= 10)),
+  rir numeric check (rir is null or (rir >= 0 and rir <= 10)),
+
+  rest_sec int check (rest_sec is null or rest_sec >= 0),
+
+  duration_sec int check (duration_sec is null or duration_sec >= 0),
+  distance_value numeric check (distance_value is null or distance_value >= 0),
+  distance_unit text check (distance_unit is null or distance_unit in ('m','km','mi')),
+  calories numeric check (calories is null or calories >= 0),
+
+  notes text,
+
+  is_complete boolean not null default false,
+  created_at timestamptz not null default now(),
+
+  constraint workout_set_unique_index unique (workout_exercise_id, set_index)
+);
+
+create index if not exists workout_set_exercise_idx on public.workout_set (workout_exercise_id);
