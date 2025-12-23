@@ -10,7 +10,10 @@ import { Text, TouchableOpacity } from 'react-native';
 export default function Index() {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [displayName, setDisplayName] = useState<string>('');
+
   const [isSigningUp, setIsSigningUp] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -54,7 +57,7 @@ export default function Index() {
   };
 
   const onSignUp = async () => {
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !password) {
       showAlert('Missing info', 'Please enter your email and password.');
       return;
@@ -70,6 +73,13 @@ export default function Index() {
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
+        options: {
+          data: {
+            display_name: displayName,
+            default_weight_unit: "lb",
+            default_distance_unit: "mi",
+          },
+        },
       });
 
       if (error) {
@@ -77,13 +87,12 @@ export default function Index() {
         return;
       }
 
-      // Depending on your Supabase email confirmation settings, the session may be null.
       if (data.session) {
         router.replace('/(tabs)/home');
       } else {
         showAlert(
           'Check your email',
-          'If email confirmations are enabled, youll need to confirm your email before logging in.'
+          'You\'ll need to confirm your email before logging in.'
         );
       }
     } finally {
@@ -92,7 +101,7 @@ export default function Index() {
   };
 
   const onForgotPassword = async () => {
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
       showAlert('Missing email', 'Enter your email first, then tap “Forgot password?”.');
       return;
@@ -117,95 +126,69 @@ export default function Index() {
     }
   };
 
+  return <Screen>
+    <Text style={typography.title}>{isSigningUp ? 'Sign up' : 'Log in'}</Text>
 
-  return !isSigningUp ? (
-    <Screen>
-      <Text style={typography.title}>Log in</Text>
-
-      <Text style={typography.label}>Email</Text>
+    {isSigningUp && <>
+      <Text style={typography.label}>Display Name</Text>
       <TextField
         autoCapitalize="none"
         autoCorrect={false}
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
+        value={displayName}
+        onChangeText={setDisplayName}
+        placeholder="John Doe"
       />
+    </>}
 
-      <Text style={typography.label}>Password</Text>
-      <TextField
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        placeholder="••••••••"
-      />
-      <TouchableOpacity
-        style={{ marginTop: 10, alignSelf: 'flex-end' }}
-        onPress={onForgotPassword}
-        disabled={isLoading}
-      >
-        <Text style={{ color: '#9aa0a6', fontWeight: '600' }}>
-          Forgot password?
-        </Text>
-      </TouchableOpacity>
+    <Text style={typography.label}>Email</Text>
+    <TextField
+      autoCapitalize="none"
+      autoCorrect={false}
+      keyboardType="email-address"
+      value={email}
+      onChangeText={text => setEmail(text.trim())}
+      placeholder="you@example.com"
+    />
 
-      <Button
-        title={isLoading ? 'Please wait...' : 'Log in'}
-        onPress={onLogin}
-        disabled={isLoading}
-        variant='primary'
-      />
+    <Text style={typography.label}>Password</Text>
+    <TextField
+      secureTextEntry
+      value={password}
+      onChangeText={text => setPassword(text.trim())}
+      placeholder="••••••••"
+    />
+    {!isSigningUp && <TouchableOpacity
+      style={{ marginTop: 10, alignSelf: 'flex-end' }}
+      onPress={onForgotPassword}
+      disabled={isLoading}
+    >
+      <Text style={{ color: '#9aa0a6', fontWeight: '600' }}>
+        Forgot password?
+      </Text>
+    </TouchableOpacity>}
 
-      <Button
-        title={isLoading ? 'Please wait...' : 'Sign up'}
-        onPress={() => setIsSigningUp(true)}
-        disabled={isLoading}
-        variant='secondary'
-      />
-    </Screen>
-  ) : (
-    <Screen>
-      <Text style={typography.title}>Sign up</Text>
-
-      <Text style={typography.label}>Email</Text>
-      <TextField
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
-      />
-
-      <Text style={typography.label}>Password</Text>
-      <TextField
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        placeholder="••••••••"
-      />
-
+    {isSigningUp && <>
       <Text style={typography.label}>Confirm Password</Text>
       <TextField
         secureTextEntry
         value={confirmPassword}
-        onChangeText={setConfirmPassword}
+        onChangeText={text => setConfirmPassword(text.trim())}
         placeholder="••••••••"
       />
+    </>}
 
-      <Button
-        title={isLoading ? 'Please wait...' : 'Create account'}
-        onPress={onSignUp}
-        disabled={isLoading}
-        variant='primary'
-      />
+    <Button
+      title={isLoading ? 'Please wait...' : isSigningUp ? 'Create account' : 'Log in'}
+      onPress={() => isSigningUp ? onSignUp() : onLogin()}
+      disabled={isLoading}
+      variant='primary'
+    />
 
-      <Button
-        title={isLoading ? 'Please wait...' : 'Go Back'}
-        onPress={() => setIsSigningUp(false)}
-        disabled={isLoading}
-        variant='secondary'
-      />
-    </Screen>
-  );
+    <Button
+      title={isLoading ? 'Please wait...' : isSigningUp ? 'Go back to login' : 'Sign up'}
+      onPress={() => setIsSigningUp(!isSigningUp)}
+      disabled={isLoading}
+      variant='secondary'
+    />
+  </Screen>;
 }

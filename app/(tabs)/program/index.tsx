@@ -1,9 +1,11 @@
 import { Button, Screen, TextField } from "@/src/components";
+import { ProgramEditorRole, ProgramUserRole } from "@/src/enums";
+import { ProgramRow } from "@/src/interfaces";
 import { supabase } from "@/src/supabase";
 import { colors, spacing, typography } from "@/src/theme";
 import { getUser, showAlert } from "@/src/utils";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -12,40 +14,26 @@ import {
   View,
 } from "react-native";
 
-type ProgramRow = {
-  id: string;
-  name: string;
-  start_date: string | null;
-  end_date: string | null;
-  notes: string | null;
 
-  trainee_user_id: string;
-  created_by_user_id: string;
-
-  coach_can_edit: boolean | null;
-  role: "trainee" | "coach";
-};
-
-function formatDateRange(start: string | null, end: string | null): string {
-  const s = start ?? "No start";
-  const e = end ?? "No end";
-  return `${s} → ${e}`;
+type ProgramRowAndRole = {
+  editor_role: ProgramEditorRole;
+  user_role: ProgramUserRole;
+  program: ProgramRow;
 }
 
 export default function ProgramsScreen() {
-  const [programs, setPrograms] = useState<ProgramRow[]>([]);
+  const [programs, setPrograms] = useState<ProgramRowAndRole[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Modal state
   const [createOpen, setCreateOpen] = useState(false);
 
+  const [newProgramName, setNewProgramName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newNumWeeks, setNewNumWeeks] = useState(1);
+  const [newRole, setNewRole] = useState<ProgramUserRole>("trainee");
 
-  // Create-program inputs
-  const [newName, setNewName] = useState("");
-  const [newStart, setNewStart] = useState("");
-  const [newEnd, setNewEnd] = useState("");
-
-  const canCreate = useMemo(() => newName.trim().length > 0, [newName]);
+  const [useSmartCreator, setUseSmartCreator] = useState(false);
+  const [smartCreatorOpen, setSmartCreatorOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -53,76 +41,34 @@ export default function ProgramsScreen() {
       const user = await getUser();
       if (!user) return;
 
-      const traineeQuery = supabase
-        .from("program")
-        .select("id,name,start_date,end_date,notes,trainee_user_id,created_by_user_id")
-        .eq("trainee_user_id", user.id);
-
-      const coachQuery = supabase
-        .from("program_coach")
-        .select("program_id,can_edit,program(id,name,start_date,end_date,notes,trainee_user_id,created_by_user_id)")
-        .eq("coach_user_id", user.id);
-
-      const [{ data: traineePrograms, error: traineeErr }, { data: coachRows, error: coachErr }] =
-        await Promise.all([traineeQuery, coachQuery]);
-
-      if (traineeErr) {
-        showAlert("Problem getting trainee data", traineeErr.message);
+      const { data, error } = await supabase
+        .from("program_membership")
+        .select(`
+          editor_role,
+          user_role,
+          program:program_id (
+            *
+          )
+        `);
+      if (error) {
+        showAlert("Error getting programs", error.message);
         return;
-      };
-      if (coachErr) {
-        showAlert("Problem getting coach data", coachErr.message);
-        return;
-      };
-
-      const traineeMapped: ProgramRow[] = (traineePrograms ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        start_date: p.start_date,
-        end_date: p.end_date,
-        notes: p.notes,
-        trainee_user_id: p.trainee_user_id,
-        created_by_user_id: p.created_by_user_id,
-        coach_can_edit: null,
-        role: "trainee",
-      }));
-
-      const coachMapped: ProgramRow[] = (coachRows ?? [])
-        .map(
-          (row: any) =>
-            row.program && ({
-              id: row.program.id,
-              name: row.program.name,
-              start_date: row.program.start_date,
-              end_date: row.program.end_date,
-              notes: row.program.notes,
-              trainee_user_id: row.program.trainee_user_id,
-              created_by_user_id: row.program.created_by_user_id,
-              coach_can_edit: row.can_edit ?? false,
-              role: "coach" as const,
-            })
-        )
-        .filter(Boolean) as ProgramRow[];
-
-      const byId = new Map<string, ProgramRow>();
-      for (const p of coachMapped) byId.set(p.id, p);
-      for (const p of traineeMapped) byId.set(p.id, p);
-
-      const merged = Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
-      setPrograms(merged);
+      }
+      console.log(data);
+      setPrograms(data as unknown as ProgramRowAndRole[])
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useEffect(() => void load(), []);
 
   const resetCreateForm = () => {
-    setNewName("");
-    setNewStart("");
-    setNewEnd("");
+    setNewProgramName("");
+    setNewDescription("");
+    setSmartCreatorOpen(false);
+    setUseSmartCreator(false);
+    setNewNumWeeks(1);
   };
 
   const openCreate = () => {
@@ -132,28 +78,40 @@ export default function ProgramsScreen() {
 
   const closeCreate = () => {
     setCreateOpen(false);
+    setSmartCreatorOpen(false);
   };
 
   const createProgram = async () => {
-    const name = newName.trim();
-    if (!name) return;
+    const name = newProgramName.trim();
+    if (!name) {
+      showAlert('Name must be present');
+      return;
+    }
 
-    const user = await getUser();
-    if (!user) return;
+    const description = newDescription.trim();
 
-    const payload = {
-      trainee_user_id: user.id,
-      created_by_user_id: user.id,
-      name,
-      start_date: newStart.trim() || null,
-      end_date: newEnd.trim() || null,
-      notes: null,
-    };
+    const numWeeks = newNumWeeks;
+    if (numWeeks < 1 || numWeeks > 52 || !Number.isInteger(numWeeks)) {
+      showAlert("Must have a positive, whole number of weeks (max 52 weeks)");
+      return;
+    }
 
     setLoading(true);
     try {
-      const { error } = await supabase.from("program").insert(payload);
-      if (error) throw error;
+      const { data: _programId, error } = await supabase.rpc(
+        "create_program_with_membership",
+        {
+          p_name: name,
+          p_description: description,
+          p_num_weeks: numWeeks,
+          p_user_role: newRole,
+        }
+      );
+
+      if (error) {
+        showAlert("Problem creating program", error.message);
+        return;
+      }
 
       closeCreate();
       await load();
@@ -162,33 +120,40 @@ export default function ProgramsScreen() {
     }
   };
 
-  const renderProgram = ({ item }: { item: ProgramRow }) => {
+  const renderProgram = ({ item }: { item: ProgramRowAndRole }) => {
     const roleLabel =
-      item.role === "trainee"
+      item.user_role === "trainee"
         ? "Trainee"
-        : item.coach_can_edit
-          ? "Coach (edit)"
-          : "Coach (view)";
+        : item.user_role === "coach"
+          ? "Coach"
+          : "Uknown role";
+
+    const editPermission = 
+      item.editor_role === "editor"
+        ? "Editor"
+        : item.editor_role === "owner"
+          ? "Owner"
+          : item.editor_role === "viewer"
+            ? "Viewer"
+            : "Unknown edit permissions";
 
     return (
       <Pressable
-        onPress={() => router.push(`/(tabs)/program/${item.id}`)}
+        onPress={() => router.push(`/(tabs)/program/${item.program.id}`)}
         style={({ pressed }) => [styles.card, pressed && { opacity: 0.75 }]}
       >
         <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={styles.cardTitle}>{item.program.name}</Text>
           <View style={styles.rolePill}>
-            <Text style={styles.rolePillText}>{roleLabel}</Text>
+            <Text style={styles.rolePillText}>{roleLabel} ({editPermission})</Text>
           </View>
         </View>
 
-        <Text style={styles.cardSub}>{formatDateRange(item.start_date, item.end_date)}</Text>
-
-        {!!item.notes && (
+        {item.program.description !== '' ? 
           <Text numberOfLines={2} style={styles.cardNotes}>
-            {item.notes}
-          </Text>
-        )}
+            {item.program.description}
+          </Text> : (<Text>No description</Text>)
+        }
       </Pressable>
     );
   };
@@ -200,7 +165,7 @@ export default function ProgramsScreen() {
       <View style={{ flex: 1, marginTop: spacing.lg }}>
         <FlatList
           data={programs}
-          keyExtractor={(p) => p.id}
+          keyExtractor={(p) => p.program.id}
           refreshing={loading}
           onRefresh={load}
           ListEmptyComponent={
@@ -227,7 +192,7 @@ export default function ProgramsScreen() {
       {/* Create Program Modal */}
       <Modal
         visible={createOpen}
-        transparent
+        transparent={true}
         animationType="fade"
         onRequestClose={closeCreate}
       >
@@ -242,16 +207,53 @@ export default function ProgramsScreen() {
             </Text>
 
             <Text style={typography.label}>Program name</Text>
-            <TextField value={newName} onChangeText={setNewName} placeholder="Winter Bulk 2026" />
+            <TextField value={newProgramName} onChangeText={setNewProgramName} placeholder="Winter Bulk 2026" />
 
-            <Text style={typography.label}>Start date (YYYY-MM-DD)</Text>
-            <TextField value={newStart} onChangeText={setNewStart} placeholder="2026-01-05" />
+            <Text style={typography.label}>Number of Weeks</Text>
+            <TextField
+              keyboardType="numeric"
+              value={newNumWeeks.toString()}
+              onChangeText={text => {
+                const num = +text;
+                if (Number.isNaN(num)) {
+                  return;
+                }
+                setNewNumWeeks(num);
+              }}
+            />
 
-            <Text style={typography.label}>End date (YYYY-MM-DD)</Text>
-            <TextField value={newEnd} onChangeText={setNewEnd} placeholder="2026-04-10" />
+            <Text style={typography.label}>Your Role</Text>
+            <Text style={typography.body}>
+              <input
+                type="radio"
+                name="role"
+                value="trainee"
+                checked={newRole === "trainee"}
+                onChange={() => setNewRole("trainee")}
+              />
+              Trainee
+              <span style={{ marginRight: '10px' }}></span>
+              <input
+                type="radio"
+                name="role"
+                value="coach"
+                checked={newRole === "coach"}
+                onChange={() => setNewRole("coach")}
+              />
+              Coach
+            </Text>
+
+            <Text style={typography.label}>Description</Text>
+            <TextField
+              value={newDescription}
+              onChangeText={setNewDescription}
+              multiline={true}
+              numberOfLines={4}
+              placeholder="Enter description..."
+            />
 
             <View style={{ marginTop: spacing.lg }}>
-              <Button title="Create" onPress={createProgram} disabled={!canCreate || loading} />
+              <Button title="Create" onPress={createProgram} disabled={loading} />
               <Button title="Cancel" onPress={closeCreate} disabled={loading} variant="secondary" />
             </View>
           </View>
@@ -290,7 +292,7 @@ const styles = {
     alignSelf: "flex-start" as const,
   },
   rolePillText: {
-    color: colors.textPrimary,
+    color: colors.surfaceAlt,
     fontWeight: "800" as const,
     fontSize: 12,
   },

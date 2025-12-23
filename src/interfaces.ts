@@ -1,202 +1,208 @@
 // interfaces.ts
 // Simple DB-aligned interfaces (1:1 with tables)
 
-import type { MuscleEntry } from "./muscles";
+import { DistanceUnit, ProgramEditorRole, ProgramUserRole, TrackableTag, WeightUnit } from "./enums";
 
 export type UUID = string;
 export type ISODate = string; // "YYYY-MM-DD"
 export type ISOTimestamp = string; // ISO 8601 timestamptz string
 
-export type UnitSystem = "metric" | "imperial";
-export type WeightUnit = "kg" | "lb";
-export type DistanceUnit = "m" | "km" | "mi";
-
 /** Effort metrics */
 export type RPE = number; // 1..10
 export type RIR = number; // 0..10
 
-/* ===================== USERS ===================== */
-
-export interface UserProfileRow {
-  user_id: UUID; // FK auth.users
-  display_name: string | null;
-
-  unit_system: UnitSystem;
-  default_weight_unit: WeightUnit;
-  default_distance_unit: DistanceUnit;
-
-  created_at: ISOTimestamp;
-}
-
-/* ===================== PROGRAMS ===================== */
-/**
- * A program belongs to exactly one trainee.
- * Coaches are attached via program_coach.
- */
 export interface ProgramRow {
   id: UUID;
 
-  trainee_user_id: UUID; // FK auth.users
-  created_by_user_id: UUID; // FK auth.users
-
   name: string;
-  notes: string | null;
-
-  start_date: ISODate | null;
-  end_date: ISODate | null;
-
-  created_at: ISOTimestamp;
+  owned_by: UUID;
+  description: string;
+  num_weeks: number;
 }
 
-/**
- * Program → coaches join table
- */
-export interface ProgramCoachRow {
-  program_id: UUID; // FK program.id
-  coach_user_id: UUID; // FK auth.users.id
-  can_edit: boolean;
-
-  created_at: ISOTimestamp;
+export interface ProgramMembershipRow {
+  program_id: UUID;
+  user_id: UUID;
+  editor_role: ProgramEditorRole;
+  user_role: ProgramUserRole;
 }
 
-/* ===================== WORKOUTS ===================== */
-/**
- * A workout is the single source of truth:
- * - planned
- * - scheduled
- * - completed
- * - edited
- */
-export interface WorkoutRow {
-  id: UUID;
+export interface UserProfileRow {
+  user_id: UUID;
+  display_name: string;
 
-  program_id: UUID; // FK program.id
-
-  name: string;
-  notes: string | null;
-
-  scheduled_date: ISODate | null;
-  is_complete: boolean;
-
-  created_at: ISOTimestamp;
+  default_weight_unit: WeightUnit;
+  default_distance_unit: DistanceUnit;
 }
 
-/* ===================== GLOBAL EXERCISES ===================== */
-
-export interface ExerciseRow {
-  id: UUID;
-  name: string;
-  description: string | null;
-
-  created_at: ISOTimestamp | null;
+export interface TrackedUserItemRow {
+  user_id: UUID;
+  item_id: UUID;
+  item_tag: TrackableTag;
 }
 
-export interface ModifierRow {
-  id: UUID;
-  name: string;
-  description: string | null;
-}
+// /* ===================== USERS ===================== */
 
-/**
- * User-specific exercise → muscle mapping.
- * muscle_id references MUSCLES[x].id (static list).
- */
-export interface ExerciseMuscleRow {
-  user_id: UUID; // FK auth.users
-  exercise_id: UUID; // FK exercise.id
+// export interface UserProfileRow {
+//   user_id: UUID; // FK auth.users
+//   display_name: string | null;
 
-  muscle_id: MuscleEntry["id"];
-  contribution: number; // 0..1
-}
+//   unit_system: UnitSystem;
+//   default_weight_unit: WeightUnit;
+//   default_distance_unit: DistanceUnit;
 
-/* ===================== WORKOUT CONTENT ===================== */
+//   created_at: ISOTimestamp;
+// }
 
-export interface WorkoutExerciseRow {
-  id: UUID;
+// /**
+//  * Program → coaches join table
+//  */
+// export interface ProgramCoachRow {
+//   program_id: UUID; // FK program.id
+//   coach_user_id: UUID; // FK auth.users.id
+//   can_edit: boolean;
 
-  workout_id: UUID; // FK workout.id
-  exercise_id: UUID; // FK exercise.id
+//   created_at: ISOTimestamp;
+// }
 
-  order: number;
-  notes: string | null;
-}
+// /* ===================== WORKOUTS ===================== */
+// /**
+//  * A workout is the single source of truth:
+//  * - planned
+//  * - scheduled
+//  * - completed
+//  * - edited
+//  */
+// export interface WorkoutRow {
+//   id: UUID;
 
-export interface WorkoutExerciseModifierRow {
-  workout_exercise_id: UUID; // FK workout_exercise.id
-  modifier_id: UUID; // FK modifier.id
-}
+//   program_id: UUID; // FK program.id
 
-export interface WorkoutSetRow {
-  id: UUID;
-  workout_exercise_id: UUID; // FK workout_exercise.id
+//   name: string;
+//   notes: string | null;
 
-  set_index: number;
+//   scheduled_date: ISODate | null;
+//   is_complete: boolean;
 
-  // Strength
-  reps: number | null;
-  weight_value: number | null;
-  weight_unit: WeightUnit | null;
+//   created_at: ISOTimestamp;
+// }
 
-  // Effort
-  rpe: RPE | null;
-  rir: RIR | null;
+// /* ===================== GLOBAL EXERCISES ===================== */
 
-  // Timing / cardio
-  rest_sec: number | null;
-  duration_sec: number | null;
-  distance_value: number | null;
-  distance_unit: DistanceUnit | null;
-  calories: number | null;
+// export interface ExerciseRow {
+//   id: UUID;
+//   name: string;
+//   description: string | null;
 
-  notes: string | null;
+//   created_at: ISOTimestamp | null;
+// }
 
-  created_at: ISOTimestamp;
-  is_complete: boolean;
-}
+// export interface ModifierRow {
+//   id: UUID;
+//   name: string;
+//   description: string | null;
+// }
 
-/* ===================== BODY METRICS ===================== */
+// /**
+//  * User-specific exercise → muscle mapping.
+//  * muscle_id references MUSCLES[x].id (static list).
+//  */
+// export interface ExerciseMuscleRow {
+//   user_id: UUID; // FK auth.users
+//   exercise_id: UUID; // FK exercise.id
 
-export interface BodyMetricsRow {
-  id: UUID;
-  user_id: UUID; // FK auth.users
+//   muscle_id: MuscleEntry["id"];
+//   contribution: number; // 0..1
+// }
 
-  measured_at: ISOTimestamp;
+// /* ===================== WORKOUT CONTENT ===================== */
 
-  bodyweight_value: number | null;
-  bodyweight_unit: WeightUnit | null;
+// export interface WorkoutExerciseRow {
+//   id: UUID;
 
-  sleep_hours: number | null;
-  soreness: number | null; // 1..10
-  fatigue: number | null; // 1..10
-  stress: number | null; // 1..10
+//   workout_id: UUID; // FK workout.id
+//   exercise_id: UUID; // FK exercise.id
 
-  notes: string | null;
-}
+//   order: number;
+//   notes: string | null;
+// }
 
-/* ===================== PR CACHE (OPTIONAL) ===================== */
+// export interface WorkoutExerciseModifierRow {
+//   workout_exercise_id: UUID; // FK workout_exercise.id
+//   modifier_id: UUID; // FK modifier.id
+// }
 
-export type PRMetric =
-  | "one_rep_max_estimate"
-  | "max_weight"
-  | "max_reps"
-  | "best_time"
-  | "best_distance"
-  | "max_volume";
+// export interface WorkoutSetRow {
+//   id: UUID;
+//   workout_exercise_id: UUID; // FK workout_exercise.id
 
-export interface PersonalRecordRow {
-  id: UUID;
+//   set_index: number;
 
-  user_id: UUID; // trainee
-  exercise_id: UUID;
+//   // Strength
+//   reps: number | null;
+//   weight_value: number | null;
+//   weight_unit: WeightUnit | null;
 
-  metric: PRMetric;
-  value: number;
-  value_unit: string | null;
+//   // Effort
+//   rpe: RPE | null;
+//   rir: RIR | null;
 
-  achieved_at: ISOTimestamp;
+//   // Timing / cardio
+//   rest_sec: number | null;
+//   duration_sec: number | null;
+//   distance_value: number | null;
+//   distance_unit: DistanceUnit | null;
+//   calories: number | null;
 
-  workout_id: UUID | null; // FK workout.id
-  set_id: UUID | null; // FK workout_set.id
+//   notes: string | null;
 
-  notes: string | null;
-}
+//   created_at: ISOTimestamp;
+//   is_complete: boolean;
+// }
+
+// /* ===================== BODY METRICS ===================== */
+
+// export interface BodyMetricsRow {
+//   id: UUID;
+//   user_id: UUID; // FK auth.users
+
+//   measured_at: ISOTimestamp;
+
+//   bodyweight_value: number | null;
+//   bodyweight_unit: WeightUnit | null;
+
+//   sleep_hours: number | null;
+//   soreness: number | null; // 1..10
+//   fatigue: number | null; // 1..10
+//   stress: number | null; // 1..10
+
+//   notes: string | null;
+// }
+
+// /* ===================== PR CACHE (OPTIONAL) ===================== */
+
+// export type PRMetric =
+//   | "one_rep_max_estimate"
+//   | "max_weight"
+//   | "max_reps"
+//   | "best_time"
+//   | "best_distance"
+//   | "max_volume";
+
+// export interface PersonalRecordRow {
+//   id: UUID;
+
+//   user_id: UUID; // trainee
+//   exercise_id: UUID;
+
+//   metric: PRMetric;
+//   value: number;
+//   value_unit: string | null;
+
+//   achieved_at: ISOTimestamp;
+
+//   workout_id: UUID | null; // FK workout.id
+//   set_id: UUID | null; // FK workout_set.id
+
+//   notes: string | null;
+// }

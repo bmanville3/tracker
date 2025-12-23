@@ -20,4 +20,6 @@ export const colors = {
 
   // States
   error: '#DC2626',
+
+  revert: '#DC2626',
 };
