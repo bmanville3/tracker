@@ -1,29 +1,25 @@
-import { Link } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Button, Screen } from "@/src/components";
+import { ExerciseModal } from "@/src/components/ExerciseModal";
+import { useState } from "react";
 
 export default function HomeScreen() {
+  const [openExerciseEditor, setOpenExerciseEditor] = useState<boolean>(false);
   return (
-    <>
-      <View style={styles.container}>
-        <Link href="/" style={styles.button}>
-          Home Screen
-        </Link>
-      </View>
-    </>
+    <Screen>
+      <Button
+        title={"Exercise Catalog"}
+        onPress={() => setOpenExerciseEditor(true)}
+      />
+      <ExerciseModal
+        allowCreateExercises={true}
+        allowEditExercises={true}
+        allowDeleteExercises={true}
+        allowSelectExercises={false}
+        visible={openExerciseEditor}
+        onRequestClose={() => {
+          setOpenExerciseEditor(false);
+        }}
+      ></ExerciseModal>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#25292e',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  button: {
-    fontSize: 20,
-    textDecorationLine: 'underline',
-    color: '#fff',
-  },
-});

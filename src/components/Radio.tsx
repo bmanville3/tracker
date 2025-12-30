@@ -1,31 +1,34 @@
-import { Pressable, Text, View } from "react-native";
-import { typography } from "../theme";
+import { colors, typography } from "@/src/theme";
+import { Pressable, PressableProps, Text, View } from "react-native";
+
+type RadioRowProps = PressableProps & {
+  label: string;
+  selected: boolean;
+  radius?: number;
+};
 
 export function RadioRow({
   label,
   selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
+  radius = 20,
+  ...props
+}: RadioRowProps) {
   return (
     <Pressable
-      onPress={onPress}
       style={{
         flexDirection: "row",
         alignItems: "center",
         paddingVertical: 8,
       }}
+      {...props}
     >
       <View
         style={{
-          width: 20,
-          height: 20,
-          borderRadius: 10,
+          width: radius,
+          height: radius,
+          borderRadius: 999,
           borderWidth: 2,
-          borderColor: selected ? "#4f46e5" : "#9aa0a6",
+          borderColor: selected ? colors.selection : "#9aa0a6",
           alignItems: "center",
           justifyContent: "center",
           marginRight: 10,
@@ -34,10 +37,10 @@ export function RadioRow({
         {selected && (
           <View
             style={{
-              width: 10,
-              height: 10,
-              borderRadius: 5,
-              backgroundColor: "#4f46e5",
+              width: radius / 2,
+              height: radius / 2,
+              borderRadius: 999,
+              backgroundColor: colors.selection,
             }}
           />
         )}

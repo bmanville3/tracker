@@ -1,5 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
 
 export default function TabsLayout() {
   return (
@@ -12,7 +12,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: "Home",
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -22,7 +22,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="program"
         options={{
-          title: 'Programs',
+          title: "Programs",
           headerShown: false,
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="barbell-outline" size={size} color={color} />
@@ -31,11 +31,11 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="body"
+        name="log"
         options={{
-          title: 'Body',
+          title: "Log",
           tabBarIcon: ({ size, color }) => (
-            <Ionicons name="body-outline" size={size} color={color} />
+            <Ionicons name="time-outline" size={size} color={color} />
           ),
         }}
       />
@@ -43,10 +43,17 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: "Profile",
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="playground"
+        options={{
+          title: "playground",
         }}
       />
     </Tabs>

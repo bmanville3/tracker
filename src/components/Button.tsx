@@ -1,66 +1,92 @@
-import { colors, radius, spacing } from '@/src/theme';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { colors, radius } from "@/src/theme";
+import {
+  Pressable,
+  PressableProps,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextProps,
+  ViewStyle,
+} from "react-native";
 
-export function Button({
-  title,
-  onPress,
-  disabled,
-  variant = 'primary',
-}: {
+type ButtonVariant = "primary" | "secondary" | "revert";
+
+type ButtonProps = Omit<PressableProps, "style"> & {
   title: string;
-  onPress: () => void;
-  disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'revert';
-}) {
-  const isPrimary = variant === 'primary';
-  const isSecondary = variant === 'secondary';
+  variant?: ButtonVariant;
+  /** Extra props to pass to the inner Text (including style) */
+  textProps?: TextProps;
+  /** Optional style for the outer Pressable */
+  style?: StyleProp<ViewStyle>;
+};
+
+export function Button(props: ButtonProps) {
+  const { title, variant = "primary", style, textProps, ...rest } = props;
+  const { style: textStyle, ...textRest } = textProps ?? {};
+  const isPrimary = variant === "primary";
+  const isSecondary = variant === "secondary";
 
   return (
-    <TouchableOpacity
+    <Pressable
       style={[
         styles.base,
-        isPrimary ? styles.primary : isSecondary ? styles.secondary : styles.revert,
-        disabled && styles.disabled,
+        isPrimary
+          ? styles.primary
+          : isSecondary
+            ? styles.secondary
+            : styles.revert,
+        rest.disabled && styles.disabled,
+        style,
       ]}
-      onPress={onPress}
-      disabled={disabled}
+      {...rest}
     >
-      <Text style={[styles.textBase, isPrimary ? styles.textPrimary : isSecondary ? styles.textSecondary : styles.textPrimary]}>
+      <Text
+        style={[
+          styles.textBase,
+          isPrimary
+            ? styles.textPrimary
+            : isSecondary
+              ? styles.textSecondary
+              : styles.textPrimary,
+          textStyle,
+        ]}
+        {...textRest}
+      >
         {title}
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    marginTop: spacing.lg,
-    paddingVertical: 14,
+    padding: 14,
     borderRadius: radius.md,
-    alignItems: 'center',
+    alignItems: "center",
+    margin: 2,
   },
   primary: {
     backgroundColor: colors.primary,
   },
   secondary: {
-    backgroundColor: colors.surface, // important: looks like a real button
-    borderWidth: 1,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
+    borderWidth: 1,
   },
   revert: {
     backgroundColor: colors.revert,
-    borderWidth: 1,
     borderColor: colors.border,
+    borderWidth: 1,
   },
   textBase: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   textPrimary: {
-    color: colors.textOnPrimary, // white text on blue
+    color: colors.textOnPrimary,
   },
   textSecondary: {
-    color: colors.textPrimary, // dark text on light button
+    color: colors.textPrimary,
   },
   disabled: {
     opacity: 0.6,

@@ -1,18 +1,19 @@
-import { Button, Screen, TextField } from '@/src/components';
-import { supabase } from '@/src/supabase';
-import { typography } from '@/src/theme';
-import { showAlert } from '@/src/utils';
-import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Button, Screen, TextField } from "@/src/components";
+import { supabase } from "@/src/supabase";
+import { CACHE_FACTORY } from "@/src/swrCache";
+import { typography } from "@/src/theme";
+import { showAlert } from "@/src/utils";
+import * as Linking from "expo-linking";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Text, TouchableOpacity } from "react-native";
 
 export default function Index() {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  
-  const [confirmPassword, setConfirmPassword] = useState<string>('');
-  const [displayName, setDisplayName] = useState<string>('');
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [displayName, setDisplayName] = useState<string>("");
 
   const [isSigningUp, setIsSigningUp] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -21,16 +22,20 @@ export default function Index() {
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        router.replace('/(tabs)/home');
+        router.replace("/(tabs)/home");
       }
     })();
   }, []);
 
+  const navigateToApp = () => {
+    CACHE_FACTORY.clearAll();
+    router.replace("/(tabs)/home");
+  };
 
   const onLogin = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      showAlert('Missing info', 'Please enter your email and password.');
+      showAlert("Missing info", "Please enter your email and password.");
       return;
     }
 
@@ -42,14 +47,14 @@ export default function Index() {
       });
 
       if (error) {
-        showAlert('Login failed', error.message);
+        showAlert("Login failed", error.message);
         return;
       }
 
       if (data.session) {
-        router.replace('/(tabs)/home');
+        navigateToApp();
       } else {
-        showAlert('Login failed', 'No session returned.');
+        showAlert("Login failed", "No session returned.");
       }
     } finally {
       setIsLoading(false);
@@ -59,12 +64,15 @@ export default function Index() {
   const onSignUp = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !password) {
-      showAlert('Missing info', 'Please enter your email and password.');
+      showAlert("Missing info", "Please enter your email and password.");
       return;
     }
 
     if (password !== confirmPassword) {
-      showAlert('Password does not match', 'Please make sure the password matches');
+      showAlert(
+        "Password does not match",
+        "Please make sure the password matches",
+      );
       return;
     }
 
@@ -83,16 +91,16 @@ export default function Index() {
       });
 
       if (error) {
-        showAlert('Sign up failed', error.message);
+        showAlert("Sign up failed", error.message);
         return;
       }
 
       if (data.session) {
-        router.replace('/(tabs)/home');
+        navigateToApp();
       } else {
         showAlert(
-          'Check your email',
-          'You\'ll need to confirm your email before logging in.'
+          "Check your email",
+          "You'll need to confirm your email before logging in.",
         );
       }
     } finally {
@@ -103,92 +111,118 @@ export default function Index() {
   const onForgotPassword = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
-      showAlert('Missing email', 'Enter your email first, then tap “Forgot password?”.');
+      showAlert(
+        "Missing email",
+        "Enter your email first, then tap “Forgot password?”.",
+      );
       return;
     }
 
-    const redirectTo = Linking.createURL('reset-password');
+    const redirectTo = Linking.createURL("reset-password");
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-        redirectTo,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        trimmedEmail,
+        {
+          redirectTo,
+        },
+      );
 
       if (error) {
-        showAlert('Reset failed', error.message);
+        showAlert("Reset failed", error.message);
         return;
       }
 
-      showAlert('Check your email', 'We sent you a password reset link.');
+      showAlert("Check your email", "We sent you a password reset link.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  return <Screen>
-    <Text style={typography.title}>{isSigningUp ? 'Sign up' : 'Log in'}</Text>
+  return (
+    <Screen>
+      <Text style={typography.title}>{isSigningUp ? "Sign up" : "Log in"}</Text>
 
-    {isSigningUp && <>
-      <Text style={typography.label}>Display Name</Text>
+      {isSigningUp && (
+        <>
+          <Text style={typography.label}>Display Name</Text>
+          <TextField
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder="John Doe"
+          />
+        </>
+      )}
+
+      <Text style={typography.label}>Email</Text>
       <TextField
         autoCapitalize="none"
         autoCorrect={false}
-        value={displayName}
-        onChangeText={setDisplayName}
-        placeholder="John Doe"
+        keyboardType="email-address"
+        value={email}
+        onChangeText={(text) => setEmail(text.trim())}
+        placeholder="you@example.com"
       />
-    </>}
 
-    <Text style={typography.label}>Email</Text>
-    <TextField
-      autoCapitalize="none"
-      autoCorrect={false}
-      keyboardType="email-address"
-      value={email}
-      onChangeText={text => setEmail(text.trim())}
-      placeholder="you@example.com"
-    />
-
-    <Text style={typography.label}>Password</Text>
-    <TextField
-      secureTextEntry
-      value={password}
-      onChangeText={text => setPassword(text.trim())}
-      placeholder="••••••••"
-    />
-    {!isSigningUp && <TouchableOpacity
-      style={{ marginTop: 10, alignSelf: 'flex-end' }}
-      onPress={onForgotPassword}
-      disabled={isLoading}
-    >
-      <Text style={{ color: '#9aa0a6', fontWeight: '600' }}>
-        Forgot password?
-      </Text>
-    </TouchableOpacity>}
-
-    {isSigningUp && <>
-      <Text style={typography.label}>Confirm Password</Text>
+      <Text style={typography.label}>Password</Text>
       <TextField
         secureTextEntry
-        value={confirmPassword}
-        onChangeText={text => setConfirmPassword(text.trim())}
+        value={password}
+        onChangeText={(text) => setPassword(text.trim())}
         placeholder="••••••••"
       />
-    </>}
+      {!isSigningUp && (
+        <TouchableOpacity
+          style={{ marginTop: 10, alignSelf: "flex-end" }}
+          onPress={onForgotPassword}
+          disabled={isLoading}
+        >
+          <Text style={{ color: "#9aa0a6", fontWeight: "600" }}>
+            Forgot password?
+          </Text>
+        </TouchableOpacity>
+      )}
 
-    <Button
-      title={isLoading ? 'Please wait...' : isSigningUp ? 'Create account' : 'Log in'}
-      onPress={() => isSigningUp ? onSignUp() : onLogin()}
-      disabled={isLoading}
-      variant='primary'
-    />
+      {isSigningUp && (
+        <>
+          <Text style={typography.label}>Confirm Password</Text>
+          <TextField
+            secureTextEntry
+            value={confirmPassword}
+            onChangeText={(text) => setConfirmPassword(text.trim())}
+            placeholder="••••••••"
+          />
+        </>
+      )}
 
-    <Button
-      title={isLoading ? 'Please wait...' : isSigningUp ? 'Go back to login' : 'Sign up'}
-      onPress={() => setIsSigningUp(!isSigningUp)}
-      disabled={isLoading}
-      variant='secondary'
-    />
-  </Screen>;
+      <Button
+        title={
+          isLoading
+            ? "Please wait..."
+            : isSigningUp
+              ? "Create account"
+              : "Log in"
+        }
+        onPress={() => (isSigningUp ? onSignUp() : onLogin())}
+        disabled={isLoading}
+        variant="primary"
+      />
+
+      <Button
+        title={
+          isLoading
+            ? "Please wait..."
+            : isSigningUp
+              ? "Go back to login"
+              : "Sign up"
+        }
+        onPress={() => setIsSigningUp(!isSigningUp)}
+        disabled={isLoading}
+        variant="secondary"
+      />
+    </Screen>
+  );
 }

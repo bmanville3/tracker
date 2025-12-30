@@ -1,12 +1,17 @@
-import { colors, radius } from '@/src/theme';
-import { StyleSheet, TextInput } from 'react-native';
+import { colors, radius } from "@/src/theme";
+import { StyleSheet, TextInput } from "react-native";
 
 export function TextField(props: React.ComponentProps<typeof TextInput>) {
-  return <TextInput
-        {...props}
-        style={[styles.input, props.style]}
-        placeholderTextColor={props.placeholderTextColor ?? colors.placeholderTextColor}
-    />;
+  const style = props.style;
+  return (
+    <TextInput
+      {...props}
+      placeholderTextColor={
+        props.placeholderTextColor ?? colors.placeholderTextColor
+      }
+      style={[styles.input, style]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
@@ -15,8 +20,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    padding: 10,
     color: colors.textPrimary,
   },
 });
