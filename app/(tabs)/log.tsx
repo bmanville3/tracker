@@ -12,7 +12,7 @@ import {
   FullAttachedWorkoutLog,
 } from "@/src/api/workoutLogApi";
 import { FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
-import { Screen } from "@/src/components";
+import { Button, Screen } from "@/src/components";
 import { ErrorBanner } from "@/src/components/ErrorBanner";
 import { logWorkoutStrategy } from "@/src/screens/workout/LogWorkoutEditorStrategy";
 import { WorkoutView } from "@/src/screens/workout/WorkoutView";
@@ -124,9 +124,13 @@ export default function WorkoutLogIndex() {
           </Text>
         </View>
 
-        <Pressable style={styles.primaryAction} onPress={openCreateWorkout}>
-          <Text style={styles.primaryActionText}>Log workout</Text>
-        </Pressable>
+        <Button
+          title={"Log workout"}
+          onPress={openCreateWorkout}
+          variant='primary'
+          style={{marginLeft: "auto", borderRadius: 999, padding: 10}}
+          textProps={{ style: { ...typography.hint, color: colors.textOnPrimary } }}
+        />
       </View>
 
       {/* Error banner */}
@@ -135,7 +139,7 @@ export default function WorkoutLogIndex() {
       ) : null}
 
       {/* Content: loading / list / empty state */}
-      <View style={styles.listContainer}>
+      <View>
         {loading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator />
@@ -159,7 +163,7 @@ export default function WorkoutLogIndex() {
                 </Text>
                 {w.name ? (
                   <Text style={styles.workoutNameText}>{w.name}</Text>
-                ) : null}
+                ) : "Untitled Workout"}
 
                 {/* Preview of exercises */}
                 <Text
@@ -228,10 +232,6 @@ const styles = StyleSheet.create({
     ...typography.hint,
     color: colors.textOnPrimary,
     fontWeight: "600",
-  },
-
-  listContainer: {
-    flex: 1,
   },
   loadingRow: {
     flexDirection: "row",

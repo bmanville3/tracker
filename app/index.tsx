@@ -224,6 +224,7 @@ export default function Index() {
         <>
           <Text style={typography.label}>Confirm Password</Text>
           <TextField
+           style={{ marginBottom: 10 }}
             secureTextEntry
             value={confirmPassword}
             onChangeText={(text) => setConfirmPassword(text.trim())}
