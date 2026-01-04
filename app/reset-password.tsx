@@ -1,4 +1,5 @@
 import { Button, Screen, TextField } from "@/src/components";
+import { ErrorBanner } from "@/src/components/ErrorBanner";
 import { supabase } from "@/src/supabase";
 import { typography } from "@/src/theme";
 import { showAlert } from "@/src/utils";
@@ -7,12 +8,14 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 
 export default function ResetPassword() {
+  const [errorMessage, setErrorMessage] = useState<null | string>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    setErrorMessage(null);
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) setIsReady(true);
     });
@@ -27,6 +30,7 @@ export default function ResetPassword() {
   }, []);
 
   const onSetPassword = async () => {
+    setErrorMessage(null);
     if (!newPassword || !confirm) {
       showAlert("Missing info", "Enter and confirm your new password.");
       return;
@@ -42,7 +46,7 @@ export default function ResetPassword() {
         password: newPassword,
       });
       if (error) {
-        showAlert("Update failed", error.message);
+        setErrorMessage(`Update failed: ${error.message}`);
         return;
       }
 
@@ -79,11 +83,14 @@ export default function ResetPassword() {
             placeholder="••••••••"
           />
 
+          {errorMessage && <ErrorBanner errorText={errorMessage}/>}
+
           <Button
             title={isLoading ? "Updating…" : "Update password"}
             onPress={onSetPassword}
-            disabled={isLoading}
+            disabled={isLoading || newPassword.length === 0 || confirm.length === 0 || newPassword !== confirm}
             variant="primary"
+            style={{ marginTop: 12 }}
           />
         </View>
       )}

@@ -1,7 +1,8 @@
 import { Button, Screen, TextField } from "@/src/components";
+import { ErrorBanner } from "@/src/components/ErrorBanner";
 import { supabase } from "@/src/supabase";
 import { CACHE_FACTORY } from "@/src/swrCache";
-import { typography } from "@/src/theme";
+import { colors, typography } from "@/src/theme";
 import { showAlert } from "@/src/utils";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
@@ -9,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Text, TouchableOpacity } from "react-native";
 
 export default function Index() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
 
@@ -20,6 +22,7 @@ export default function Index() {
 
   useEffect(() => {
     (async () => {
+      setErrorMessage(null);
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         router.replace("/(tabs)/home");
@@ -28,6 +31,7 @@ export default function Index() {
   }, []);
 
   const navigateToApp = () => {
+    setErrorMessage(null);
     CACHE_FACTORY.clearAll();
     router.replace("/(tabs)/home");
   };
@@ -47,14 +51,14 @@ export default function Index() {
       });
 
       if (error) {
-        showAlert("Login failed", error.message);
+        setErrorMessage(`Login failed: ${error.message}`);
         return;
       }
 
       if (data.session) {
         navigateToApp();
       } else {
-        showAlert("Login failed", "No session returned.");
+        setErrorMessage("Login failed. No sessions returned.")
       }
     } finally {
       setIsLoading(false);
@@ -68,6 +72,7 @@ export default function Index() {
       return;
     }
 
+
     if (password !== confirmPassword) {
       showAlert(
         "Password does not match",
@@ -78,10 +83,12 @@ export default function Index() {
 
     setIsLoading(true);
     try {
+      const emailRedirectTo = Linking.createURL("/");
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
         options: {
+          emailRedirectTo, 
           data: {
             display_name: displayName,
             default_weight_unit: "lb",
@@ -91,17 +98,44 @@ export default function Index() {
       });
 
       if (error) {
-        showAlert("Sign up failed", error.message);
+        if (error.message?.toLowerCase().includes("already registered")) {
+          setErrorMessage("You already have an account. Try logging in instead.");
+        } else {
+          setErrorMessage(error.message);
+        }
+        return;
+      }
+
+      if (!data.user) {
+        setErrorMessage("Something went wrong signing you up. Please try again.");
         return;
       }
 
       if (data.session) {
         navigateToApp();
+        return;
       } else {
-        showAlert(
-          "Check your email",
-          "You'll need to confirm your email before logging in.",
-        );
+        const identities = data.user.identities ?? [];
+        if (identities.length > 0) {
+          showAlert("We sent you a confirmation email. Please check your inbox.");
+        } else {
+          showAlert(
+            "You already started signing up before. We've resent your confirmation email—check your inbox.",
+            "If this account is already registered and confirmed, please sign in."
+          );
+          const { error: resendError } = await supabase.auth.resend({
+            type: "signup",
+            email,
+            options: {
+              emailRedirectTo,
+            },
+          });
+
+          if (resendError) {
+            console.error(resendError);
+            setErrorMessage(`Error with resend: ${resendError.message}`);
+          }
+        }
       }
     } finally {
       setIsLoading(false);
@@ -130,7 +164,7 @@ export default function Index() {
       );
 
       if (error) {
-        showAlert("Reset failed", error.message);
+        setErrorMessage(`Reset failed: ${error.message}`);
         return;
       }
 
@@ -180,7 +214,7 @@ export default function Index() {
           onPress={onForgotPassword}
           disabled={isLoading}
         >
-          <Text style={{ color: "#9aa0a6", fontWeight: "600" }}>
+          <Text style={{ color: colors.placeholderTextColor, fontWeight: "600", marginBottom: 4 }}>
             Forgot password?
           </Text>
         </TouchableOpacity>
@@ -198,6 +232,8 @@ export default function Index() {
         </>
       )}
 
+      {errorMessage && <ErrorBanner errorText={errorMessage}/>}
+
       <Button
         title={
           isLoading
@@ -206,8 +242,16 @@ export default function Index() {
               ? "Create account"
               : "Log in"
         }
-        onPress={() => (isSigningUp ? onSignUp() : onLogin())}
-        disabled={isLoading}
+        onPress={() => {
+          setErrorMessage(null);
+          isSigningUp ? onSignUp() : onLogin();
+        }}
+        disabled={isLoading
+          || password.length === 0
+          || email.length === 0
+          || isSigningUp && (password !== confirmPassword
+          || displayName.length === 0)
+        }
         variant="primary"
       />
 
@@ -219,7 +263,10 @@ export default function Index() {
               ? "Go back to login"
               : "Sign up"
         }
-        onPress={() => setIsSigningUp(!isSigningUp)}
+        onPress={() => {
+          setErrorMessage(null);
+          setIsSigningUp(!isSigningUp);
+        }}
         disabled={isLoading}
         variant="secondary"
       />

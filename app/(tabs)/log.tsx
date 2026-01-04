@@ -13,6 +13,7 @@ import {
 } from "@/src/api/workoutLogApi";
 import { FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
 import { Screen } from "@/src/components";
+import { ErrorBanner } from "@/src/components/ErrorBanner";
 import { logWorkoutStrategy } from "@/src/screens/workout/LogWorkoutEditorStrategy";
 import { WorkoutView } from "@/src/screens/workout/WorkoutView";
 import { colors, spacing, typography } from "@/src/theme";
@@ -130,9 +131,7 @@ export default function WorkoutLogIndex() {
 
       {/* Error banner */}
       {errorText ? (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{errorText}</Text>
-        </View>
+        <ErrorBanner errorText={errorText}/>
       ) : null}
 
       {/* Content: loading / list / empty state */}
@@ -229,33 +228,6 @@ const styles = StyleSheet.create({
     ...typography.hint,
     color: colors.textOnPrimary,
     fontWeight: "600",
-  },
-
-  calendarCard: {
-    borderRadius: 16,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.lg,
-  },
-  calendarSubtitle: {
-    ...typography.hint,
-    marginBottom: spacing.sm,
-    color: colors.textSecondary,
-  },
-
-  errorBanner: {
-    padding: spacing.sm,
-    borderRadius: 8,
-    backgroundColor: "#330000",
-    borderWidth: 1,
-    borderColor: "crimson",
-    marginBottom: spacing.md,
-  },
-  errorText: {
-    ...typography.hint,
-    color: "crimson",
   },
 
   listContainer: {
