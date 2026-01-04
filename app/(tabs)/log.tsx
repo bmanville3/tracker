@@ -7,42 +7,34 @@ import {
   View,
 } from "react-native";
 
-import { fetchExercises } from "@/src/api/exerciseApi";
 import {
-  fetchCompletedLast30Workouts,
-  FullDetachedWorkout,
-  fullToDetached,
-  insertFullDetachedWorkout,
-  updateFullDetachedWorkout,
-  type FullWorkout,
-} from "@/src/api/workoutApi";
+  fetchLastNWorkoutLogs,
+  FullAttachedWorkoutLog,
+} from "@/src/api/workoutLogApi";
+import { FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
 import { Screen } from "@/src/components";
-import { WorkoutView } from "@/src/components/WorkoutView";
-import { ExerciseRow, type UUID } from "@/src/interfaces";
+import { logWorkoutStrategy } from "@/src/screens/workout/LogWorkoutEditorStrategy";
+import { WorkoutView } from "@/src/screens/workout/WorkoutView";
 import { colors, spacing, typography } from "@/src/theme";
-import { toISODate } from "@/src/utils";
+import { UUID } from "@/src/types";
 
 export default function WorkoutLogIndex() {
   // WorkoutView modal-ish state
-  const [workoutViewTitle, setWorkoutViewTitle] = useState<string | null>(null);
-  const [saveFunctionForWorkoutView, setSaveFunctionForWorkoutView] = useState<
-    ((w: FullDetachedWorkout) => Promise<boolean>) | null
-  >(null);
   const [workoutViewIsActive, setWorkoutViewIsActive] =
     useState<boolean>(false);
-  const [fromWorkout, setFromWorkout] = useState<FullDetachedWorkout | null>(
-    null,
-  );
+  const [fromWorkout, setFromWorkout] =
+    useState<FullDetachedWorkoutForMode<"log"> | null>(null);
+  const [updateId, setUpdateId] = useState<UUID | null>(null);
 
-  const [displayedWorkouts, setDisplayedWorkouts] = useState<FullWorkout[]>([]);
-  const [exercises, setExercises] = useState<Map<UUID, ExerciseRow>>(new Map());
+  const [displayedWorkouts, setDisplayedWorkouts] = useState<
+    FullAttachedWorkoutLog[]
+  >([]);
 
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState<string | null>(null);
 
   const reloadWorkouts = async () => {
-    const last30 = await fetchCompletedLast30Workouts();
-    setExercises(await fetchExercises());
+    const last30 = await fetchLastNWorkoutLogs(30);
     setDisplayedWorkouts(last30);
   };
 
@@ -53,8 +45,7 @@ export default function WorkoutLogIndex() {
         setErrorText(null);
         setFromWorkout(null);
         setWorkoutViewIsActive(false);
-        setWorkoutViewTitle(null);
-        setSaveFunctionForWorkoutView(null);
+        setUpdateId(null);
 
         await reloadWorkouts();
       } catch (e: any) {
@@ -69,75 +60,50 @@ export default function WorkoutLogIndex() {
     const previews: Record<UUID, string> = {};
     for (const fw of displayedWorkouts) {
       const names: string[] = [];
-      for (const ex of fw.exercises) {
-        const name = ex.exercise_id;
-        if (name && !names.includes(name)) {
-          names.push(name);
-        }
+      for (const i in fw.exercises) {
+        const ex = fw.exercises[i];
+        const sets = fw.sets[i];
+        names.push(`${sets.length} Sets - ${ex.exercise.name}`);
         if (names.length >= 2) break;
       }
 
       if (names.length > 0) {
         let label = names.join(", ");
         if (fw.exercises.length > names.length) {
-          label += "…";
+          label += "...";
         }
-        previews[fw.id] = label;
+        previews[fw.logId] = label;
       } else {
-        previews[fw.id] = "No exercises logged";
+        previews[fw.logId] = "No exercises logged";
       }
     }
     return previews;
   }, [displayedWorkouts]);
 
   function openCreateWorkout() {
-    setWorkoutViewTitle("Create");
-    setWorkoutViewIsActive(true);
     setFromWorkout(null);
-
-    setSaveFunctionForWorkoutView(() => async (wk: FullDetachedWorkout) => {
-      await insertFullDetachedWorkout(wk, "completed", toISODate(new Date()));
-      setWorkoutViewIsActive(false);
-      return true;
-    });
+    setUpdateId(null);
+    setWorkoutViewIsActive(true);
   }
 
-  function openEditWorkout(fullWorkout: FullWorkout) {
-    setWorkoutViewTitle("Edit");
+  function openEditWorkout(fullWorkout: FullAttachedWorkoutLog) {
     setWorkoutViewIsActive(true);
-    (async () => setFromWorkout(await fullToDetached(fullWorkout)))();
-
-    setSaveFunctionForWorkoutView(() => async (wk: FullDetachedWorkout) => {
-      await updateFullDetachedWorkout(
-        fullWorkout.id,
-        wk,
-        "completed",
-        toISODate(new Date()),
-      );
-      setWorkoutViewIsActive(false);
-      return true;
-    });
+    const { logId, ...rest } = fullWorkout;
+    setFromWorkout(rest satisfies FullDetachedWorkoutForMode<"log">);
+    setUpdateId(logId satisfies UUID);
   }
 
   if (workoutViewIsActive) {
     return (
       <WorkoutView
         isActive={workoutViewIsActive}
-        onSave={async (wk) => {
-          if (!saveFunctionForWorkoutView) return false;
-          const success = saveFunctionForWorkoutView(wk);
-          return success.then((successful) => {
-            if (successful) {
-              reloadWorkouts();
-            }
-            return successful;
-          });
-        }}
+        onSuccessfulSave={reloadWorkouts}
         requestClose={() => setWorkoutViewIsActive(false)}
-        createAsTemplate={false}
         allowEditing={true}
-        saveButtonTitle={workoutViewTitle}
         loadWithExisting={fromWorkout}
+        updateWorkoutId={updateId}
+        strategy={logWorkoutStrategy}
+        requestCloseOnSuccessfulSave={true}
       />
     );
   }
@@ -177,13 +143,14 @@ export default function WorkoutLogIndex() {
             <Text style={styles.loadingText}>Loading workouts…</Text>
           </View>
         ) : displayedWorkouts.length > 0 ? (
-          displayedWorkouts.map((fw, idx) => {
+          displayedWorkouts.map((fw) => {
             const w = fw.workout;
-            const preview = previewByWorkoutId[w.id] ?? "";
+
+            const preview = previewByWorkoutId[fw.logId] ?? "";
 
             return (
               <Pressable
-                key={`${fw.id}-${w.id}-${idx}`}
+                key={`${fw.logId}`}
                 onPress={() => openEditWorkout(fw)}
                 style={styles.workoutCard}
               >

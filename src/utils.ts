@@ -173,6 +173,10 @@ export function toISODate(d: Date): ISODate {
   return `${y}-${m}-${day}` as ISODate;
 }
 
+export function todayISO(): ISODate {
+  return toISODate(new Date());
+}
+
 export function fromISODate(d: ISODate): Date {
   const [yearStr, monthStr, dayStr] = d.split("-");
 
@@ -181,4 +185,43 @@ export function fromISODate(d: ISODate): Date {
   const day = Number(dayStr);
 
   return new Date(year, month - 1, day);
+}
+
+export function arraysEqual<T>(
+  a: readonly T[],
+  b: readonly T[],
+  eq: (x: T, y: T) => boolean,
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!eq(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+export function doubleArraysEqual<T>(
+  a: readonly T[][],
+  b: readonly T[][],
+  eq: (x: T, y: T) => boolean,
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!arraysEqual(a[i], b[i], eq)) return false;
+  }
+  return true;
+}
+
+export function tripleArraysEqual<T>(
+  a: readonly T[][][],
+  b: readonly T[][][],
+  eq: (x: T, y: T) => boolean,
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!doubleArraysEqual(a[i], b[i], eq)) return false;
+  }
+  return true;
 }

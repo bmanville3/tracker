@@ -119,6 +119,10 @@ export class SwrKeyedCache<V> implements CacheHandle {
         .filter(([, v]) => v !== null),
     ) as Map<string, V>;
   }
+
+  delete(key: string): boolean {
+    return this.store.delete(key);
+  }
 }
 
 export class SwrIdCache<T extends Identified> implements CacheHandle {

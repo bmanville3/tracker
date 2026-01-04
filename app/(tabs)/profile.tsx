@@ -1,7 +1,7 @@
 import { Button, RadioRow, Screen, TextField } from "@/src/components";
-import { UserProfileRow } from "@/src/interfaces";
 import { supabase } from "@/src/supabase";
 import { typography } from "@/src/theme";
+import { ProfileRow } from "@/src/types";
 import { DistanceUnit, WeightUnit } from "@/src/types/enums";
 import { logOut, PROFILE_CACHE, requireGetUser, showAlert } from "@/src/utils";
 import { useEffect, useMemo, useState } from "react";
@@ -91,7 +91,7 @@ export default function Profile() {
         return;
       }
 
-      const newProfile = data as UserProfileRow;
+      const newProfile = data satisfies ProfileRow;
 
       setInitial({
         displayName: newProfile.display_name,

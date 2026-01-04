@@ -47,7 +47,7 @@ export type AbstractWorkoutExercise = {
   exercise_id: UUID;
 
   superset_group: number | null;
-  order: string | null;
+  exercise_index: number;
 
   notes: string;
 };
@@ -63,7 +63,7 @@ export type WorkoutExerciseTemplateRow = AbstractWorkoutExercise;
 export type AbstractWorkoutExerciseSet = {
   id: UUID;
   workout_exercise_id: UUID;
-  set_number: number;
+  set_index: number;
 
   weight_unit: WeightUnit;
   distance_unit: DistanceUnit;
@@ -71,9 +71,11 @@ export type AbstractWorkoutExerciseSet = {
   set_type: SetType;
   duration_seconds: number | null;
   performance_type: PerformanceType;
+  rest_seconds_before: number | null;
 };
 
-export type PossiblePerformanceSetFields = AbstractWorkoutExerciseSet & {
+export type PossiblePerformanceSetFields = {
+  performance_type: PerformanceType;
   percentage_of_max: null;
   max_percentage_exercise_id: null;
   reps: null;
@@ -87,43 +89,60 @@ export type PossiblePerformanceSetFields = AbstractWorkoutExerciseSet & {
 // full workout+exercise+set fields for template
 ///////////
 
+export type TemplatePerformanceType = Extract<
+  PerformanceType,
+  "percentage" | "rpe"
+>;
+
+export type PossiblePerformanceSetTemplateFields =
+  PossiblePerformanceSetFields & {
+    performance_type: TemplatePerformanceType;
+  };
+
 export type PercentageTemplateSet = Omit<
-  PossiblePerformanceSetFields,
+  PossiblePerformanceSetTemplateFields,
   "percentage_of_max" | "max_percentage_exercise_id" | "reps"
 > & {
   performance_type: "percentage";
-  percentage_of_max: number;
-  max_percentage_exercise_id: UUID;
-  reps: number;
+  percentage_of_max: number | null; // defaults to workout_exercise->exercise_id if null
+  max_percentage_exercise_id: UUID | null;
+  reps: number | null;
 };
 
 export type RpeTemplateSet = Omit<
-  PossiblePerformanceSetFields,
+  PossiblePerformanceSetTemplateFields,
   "rpe" | "reps"
 > & {
   performance_type: "rpe";
-  rpe: RPE;
-  reps: number;
+  rpe: RPE | null;
+  reps: number | null;
 };
 
-export type WorkoutExerciseSetTemplate = PercentageTemplateSet | RpeTemplateSet;
+export type WorkoutExerciseSetTemplateRow = AbstractWorkoutExerciseSet &
+  (PercentageTemplateSet | RpeTemplateSet);
 
 ///////////
 // full workout+exercise+set fields for logs
 ///////////
 
+export type LogPerformanceType = Extract<PerformanceType, "weight">;
+
+export type PossiblePerformanceSetLogFields = PossiblePerformanceSetFields & {
+  performance_type: LogPerformanceType;
+};
+
 export type WeightLogSet = Omit<
-  PossiblePerformanceSetFields,
+  PossiblePerformanceSetLogFields,
   "rpe" | "reps" | "weight" | "duration_seconds"
 > & {
   performance_type: "weight";
-  weight: number;
-  reps: number;
-  rpe: RPE;
+  weight: number | null;
+  reps: number | null;
+  rpe: RPE | null;
   duration_seconds: number | null;
 };
 
-export type WorkoutExerciseSetLogRow = WeightLogSet & {
-  is_complete: boolean;
-  rest_seconds_before: number | null;
-};
+export type WorkoutExerciseSetLogRow = AbstractWorkoutExerciseSet &
+  WeightLogSet & {
+    is_complete: boolean;
+  };

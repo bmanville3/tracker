@@ -1,6 +1,7 @@
 export * from "./Button";
 export * from "./ClosableModal";
 export * from "./FAB";
+export * from "./ModalPicker";
 export * from "./NumberField";
 export * from "./Radio";
 export * from "./Screen";

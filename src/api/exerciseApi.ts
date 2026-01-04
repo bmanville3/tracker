@@ -1,3 +1,4 @@
+import React from "react";
 import { MINUTE_MS } from "../constants";
 import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
@@ -28,7 +29,7 @@ export async function fetchExercises(): Promise<Map<UUID, ExerciseRow>> {
       showAlert("Error fetching exercises from database", error.message);
       throw error;
     }
-    return data as ExerciseRow[];
+    return data satisfies ExerciseRow[];
   });
 }
 
@@ -46,7 +47,7 @@ export async function addExercise(
     throw error;
   }
 
-  EXERCISE_CACHE.upsert(data as ExerciseRow);
+  EXERCISE_CACHE.upsert(data satisfies ExerciseRow);
 }
 
 export async function updateExercise(args: {
@@ -67,7 +68,7 @@ export async function updateExercise(args: {
     throw error;
   }
 
-  EXERCISE_CACHE.upsert(data as ExerciseRow);
+  EXERCISE_CACHE.upsert(data satisfies ExerciseRow);
 }
 
 export async function deleteExercise(id: UUID): Promise<void> {
@@ -93,7 +94,7 @@ export async function fetchAllExerciseMuscleVolumes(): Promise<
       );
       throw error;
     }
-    return data as ExerciseMuscleRow[];
+    return data satisfies ExerciseMuscleRow[];
   });
 }
 
@@ -121,7 +122,7 @@ export async function fetchExerciseMuscleVolumes(
 }
 
 export async function addExerciseMuscleVolume(args: {
-  muscle_id: UUID;
+  muscle_id: MuscleGroup;
   exercise_id: UUID;
   volume_factor: number;
   user_id: UUID;
@@ -145,7 +146,7 @@ export async function addExerciseMuscleVolume(args: {
     throw error;
   }
 
-  EXERCISE_MUSCLE_CACHE.upsert(data as ExerciseMuscleRow);
+  EXERCISE_MUSCLE_CACHE.upsert(data satisfies ExerciseMuscleRow);
 }
 
 export async function updateExerciseMuscleVolume(args: {
@@ -169,7 +170,7 @@ export async function updateExerciseMuscleVolume(args: {
     throw error;
   }
 
-  EXERCISE_MUSCLE_CACHE.upsert(data as ExerciseMuscleRow);
+  EXERCISE_MUSCLE_CACHE.upsert(data satisfies ExerciseMuscleRow);
 }
 
 export async function deleteExerciseMuscleVolume(id: UUID): Promise<void> {
@@ -242,4 +243,27 @@ export async function searchExercises(
   });
 
   return [...startsWithRaw, ...startsWithStripped, ...includesPartsOfStripped];
+}
+
+export async function getExerciseAsync(
+  exericse_id: UUID,
+): Promise<ExerciseRow | null> {
+  return (await fetchExercises()).get(exericse_id) ?? null;
+}
+
+export function getExerciseWithState(id: UUID): ExerciseRow | null {
+  const [ex, setEx] = React.useState<ExerciseRow | null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const exercise = await getExerciseAsync(id);
+        setEx(exercise);
+      } catch (e) {
+        setEx(null);
+      }
+    })();
+  }, [id]);
+
+  return ex;
 }

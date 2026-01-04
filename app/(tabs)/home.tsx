@@ -1,5 +1,5 @@
 import { Button, Screen } from "@/src/components";
-import { ExerciseModal } from "@/src/components/ExerciseModal";
+import { ExerciseModal } from "@/src/screens/ExerciseModal";
 import { useState } from "react";
 
 export default function HomeScreen() {

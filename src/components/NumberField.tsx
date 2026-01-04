@@ -64,6 +64,16 @@ export function NumberField({
 
         let nextText = text;
 
+        const numericPattern =
+          numberType === "int"
+            ? /^-?\d+$/ // integers
+            : /^-?\d*\.?\d*$/; // floats like "1", "1.", ".5", "1.23"
+
+        if (!numericPattern.test(nextText)) {
+          // ignore keystroke (don't update textValue)
+          return;
+        }
+
         const parsed =
           numberType === "int"
             ? Number.parseInt(nextText, 10)
@@ -95,6 +105,7 @@ export function NumberField({
         setTextValue(nextText);
         onChangeNumber(parsed);
       }}
+      onBlur={() => setTextValue(numberValue?.toString() ?? "")}
     />
   );
 }
