@@ -38,13 +38,6 @@ export default function TabsLayout() {
           ),
         }}
       />
-
-      <Tabs.Screen
-        name="playground"
-        options={{
-          title: "playground",
-        }}
-      />
     </Tabs>
   );
 }
