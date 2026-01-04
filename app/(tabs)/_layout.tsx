@@ -20,17 +20,6 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="program"
-        options={{
-          title: "Programs",
-          headerShown: false,
-          tabBarIcon: ({ size, color }) => (
-            <Ionicons name="barbell-outline" size={size} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
         name="log"
         options={{
           title: "Log",
