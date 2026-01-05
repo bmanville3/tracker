@@ -146,7 +146,7 @@ export async function upsertWorkoutLog(ctx: {
     const setsPayloadFlattened: Omit<WorkoutExerciseSetLogRow, "id">[] =
       sets.flatMap((setsForExercise, exerciseWorkoutIndex) =>
         setsForExercise.map((set, setIndex) => {
-          const {oldId, ...rest} = set;
+          const {id, ...rest} = set;
           return {
             ...rest,
             workout_exercise_id: exerciseWorkoutIndexToId[exerciseWorkoutIndex],
