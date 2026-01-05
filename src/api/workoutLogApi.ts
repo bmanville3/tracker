@@ -72,21 +72,21 @@ export async function upsertWorkoutLog(ctx: {
 
   const runAll = async (): Promise<[boolean, UUID | null]> => {
     let command;
-    let oldExercisesBeforeInsert: WorkoutExerciseLogRow[] | null = null;
+    let oldExerciseWorkoutsBeforeInsert: WorkoutExerciseLogRow[] | null = null;
     if (workoutLogId) {
-      const { data: oldExercises, error: selectOldExercisesErr } =
+      const { data: oldExerciseWorkouts, error: selectOoldExerciseWorkoutsErr } =
         await supabase
           .from("workout_exercise_log")
           .select("*")
           .eq("workout_id", workoutLogId);
-      if (selectOldExercisesErr) {
+      if (selectOoldExerciseWorkoutsErr) {
         showAlert(
           "Error fetching old exercises",
-          selectOldExercisesErr.message,
+          selectOoldExerciseWorkoutsErr.message,
         );
         return [false, workoutLogId];
       }
-      oldExercisesBeforeInsert = oldExercises satisfies WorkoutExerciseLogRow[];
+      oldExerciseWorkoutsBeforeInsert = oldExerciseWorkouts satisfies WorkoutExerciseLogRow[];
 
       const { program_row: _programRow, ...baseWorkout } = workout;
       const workoutRowPayload = {
@@ -116,20 +116,14 @@ export async function upsertWorkoutLog(ctx: {
 
     const exercisePayload: Omit<WorkoutExerciseLogRow, "id">[] = exercises.map(
       (ex, i) => {
-        const {
-          exercise,
-          id: _oldId,
-          workout_id: _oldWorkoutId,
-          exercise_id: _oldExerciseId,
-          exercise_index: _oldExerciseIndex,
-          ...rest
-        } = ex as WorkoutExerciseLogRow & { exercise: (typeof ex)["exercise"] };
+        const { exercise, notes, superset_group } = ex;
 
         return {
-          ...rest,
           exercise_id: exercise.id,
           exercise_index: i,
           workout_id: workoutLogNewRow.id,
+          notes,
+          superset_group
         } satisfies Omit<WorkoutExerciseLogRow, "id">;
       },
     );
@@ -143,24 +137,18 @@ export async function upsertWorkoutLog(ctx: {
       showAlert("Error inserting new exercises", exerciseInsertionErr.message);
       return [false, workoutLogNewRow.id];
     }
-    const orderToExercise = Object.fromEntries(
+    const exerciseWorkoutIndexToId = Object.fromEntries(
       (insertedExercises satisfies WorkoutExerciseLogRow[]).map((ex) => [
         ex.exercise_index,
         ex.id,
       ]),
     );
     const setsPayloadFlattened: Omit<WorkoutExerciseSetLogRow, "id">[] =
-      sets.flatMap((setsForExercise, exerciseIndex) =>
+      sets.flatMap((setsForExercise, exerciseWorkoutIndex) =>
         setsForExercise.map((set, setIndex) => {
-          const {
-            id: _oldSetId,
-            workout_exercise_id: _oldWorkoutExerciseId,
-            ...rest
-          } = set as WorkoutExerciseSetLogRow;
-
           return {
-            ...rest,
-            workout_exercise_id: orderToExercise[exerciseIndex],
+            ...set,
+            workout_exercise_id: exerciseWorkoutIndexToId[exerciseWorkoutIndex],
             set_index: setIndex,
           } satisfies Omit<WorkoutExerciseSetLogRow, "id">;
         }),
@@ -176,22 +164,15 @@ export async function upsertWorkoutLog(ctx: {
 
     if (
       workoutLogId &&
-      oldExercisesBeforeInsert !== null &&
-      oldExercisesBeforeInsert.length > 0
+      oldExerciseWorkoutsBeforeInsert !== null &&
+      oldExerciseWorkoutsBeforeInsert.length > 0
     ) {
-      const oldExerciseIds = [...oldExercisesBeforeInsert.map((ex) => ex.id)];
-      const { error: deleteOldSetsErr } = await supabase
-        .from("workout_exercise_set_log")
-        .delete()
-        .in("workout_exercise_id", oldExerciseIds);
-      if (deleteOldSetsErr) {
-        showAlert("Error deleting old sets", deleteOldSetsErr.message);
-        return [false, workoutLogNewRow.id];
-      }
+      // deleting all old workout-exercises will cascade delete all workout-exercise-sets
+      const oldExerciseWorkoutIds = [...oldExerciseWorkoutsBeforeInsert.map((exWk) => exWk.id)];
       const { error: deleteOldExercises } = await supabase
         .from("workout_exercise_log")
         .delete()
-        .eq("workout_id", workoutLogId);
+        .in("id", oldExerciseWorkoutIds);
       if (deleteOldExercises) {
         showAlert("Error deleting old exercises", deleteOldExercises.message);
         return [false, workoutLogNewRow.id];

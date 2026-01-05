@@ -18,6 +18,7 @@ import { logWorkoutStrategy } from "@/src/screens/workout/LogWorkoutEditorStrate
 import { WorkoutView } from "@/src/screens/workout/WorkoutView";
 import { colors, spacing, typography } from "@/src/theme";
 import { UUID } from "@/src/types";
+import { anyErrorToString } from "@/src/utils";
 
 export default function WorkoutLogIndex() {
   // WorkoutView modal-ish state
@@ -50,7 +51,7 @@ export default function WorkoutLogIndex() {
 
         await reloadWorkouts();
       } catch (e: any) {
-        setErrorText(e?.message ?? "Failed to load workouts");
+        setErrorText(anyErrorToString(e, "Failed to load workouts"));
       } finally {
         setLoading(false);
       }

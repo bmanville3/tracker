@@ -12,8 +12,8 @@ import {
   updateExerciseMuscleVolume,
 } from "@/src/api/exerciseApi";
 import { fetchMuscleGroups } from "@/src/api/muscleApi";
-import { Button, ClosableModal, Selection, TextField } from "@/src/components";
-import { colors, typography } from "@/src/theme";
+import { Button, ClosableModal, ModalPicker, Selection, TextField } from "@/src/components";
+import { colors, spacing, typography } from "@/src/theme";
 import {
   EXERCISE_AND_MUSCLE_TAGS,
   ExerciseAndMuscleTag,
@@ -24,6 +24,7 @@ import {
   MuscleGroupRow,
 } from "@/src/types";
 import {
+  anyErrorToString,
   capitalizeFirstLetter,
   requireGetUser,
   setsEqual,
@@ -100,6 +101,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
   const [exerciseError, setExerciseError] = useState<string | null>(null);
   const [exercises, setExercises] = useState<ExerciseRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchOnlyUserCreated, setSearchOnlyUserCreated] = useState<boolean>(false);
 
   const [selectedTags, setSelectedTags] = useState<Set<ExerciseAndMuscleTag>>(
     new Set(),
@@ -130,9 +132,9 @@ export function ExerciseModal(props: ExerciseModalProps) {
     null,
   );
 
-  const performSearch = async (q: string, tags: Set<ExerciseAndMuscleTag>) => {
+  const performSearch = async (q: string, tags: Set<ExerciseAndMuscleTag>, byUser: boolean) => {
     const trimmed = q.trim();
-    if (!trimmed && tags.size === 0) {
+    if (!trimmed && tags.size === 0 && byUser === false) {
       await loadDefaultSearch();
       return;
     }
@@ -142,9 +144,13 @@ export function ExerciseModal(props: ExerciseModalProps) {
     try {
       const xs = await searchExercises(trimmed, tags);
       xs.sort((a, b) => a.name.localeCompare(b.name));
-      setExercises(xs);
+      if (byUser) {
+        setExercises(xs.filter(ex => ex.created_by_user !== null));
+      } else {
+        setExercises(xs);
+      }
     } catch (e: any) {
-      setExerciseError(e?.message ?? "Failed to search exercises");
+      setExerciseError(anyErrorToString(e, "Failed to search exercises"));
     } finally {
       setLoadingExercises(false);
     }
@@ -166,9 +172,12 @@ export function ExerciseModal(props: ExerciseModalProps) {
         .forEach((er) => xs.push(er));
       xs = [...new Map(xs.map((er) => [er.id, er])).values()];
       xs.sort((a, b) => a.name.localeCompare(b.name));
+      if (searchOnlyUserCreated) {
+        xs = xs.filter(x => x.created_by_user !== null)
+      }
       setExercises(xs.slice(0, Math.min(xs.length, 10)));
     } catch (e: any) {
-      setExerciseError(e?.message ?? "Failed to search exercises");
+      setExerciseError(anyErrorToString(e, "Failed to search exercises"));
     } finally {
       setLoadingExercises(false);
     }
@@ -192,6 +201,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
     setSelectedExerciseForVolumeMuscleToVolume(null);
     setVolumeError(null);
     setSelection(null);
+    setSearchOnlyUserCreated(false);
     setMode("Search");
     initialVolumeValuesRef.current = null;
     initialEditValuesRef.current = {
@@ -216,8 +226,8 @@ export function ExerciseModal(props: ExerciseModalProps) {
 
   useEffect(() => {
     if (!visible) return;
-    void performSearch(searchQuery, selectedTags);
-  }, [searchQuery, selectedTags, visible]);
+    void performSearch(searchQuery, selectedTags, searchOnlyUserCreated);
+  }, [searchQuery, selectedTags, visible, searchOnlyUserCreated]);
 
   const handleSelectExercise = (ex: ExerciseRow | null) => {
     if (!allowSelectExercises) return;
@@ -252,7 +262,18 @@ export function ExerciseModal(props: ExerciseModalProps) {
       resetAll();
       showAlert(`${ex.name} has been deleted`);
     } catch (e: any) {
-      showAlert("Error deleting exercise", e?.message ?? String(e));
+      const msg = anyErrorToString(e, "Error deleting exercise");
+      if (msg.includes("delete on table")) {
+        if (msg.includes("workout_exercise_log")) {
+          setExerciseError("Cannot delete exercise as a workout log references it");
+        } else if (msg.includes("workout_exercise_template")) {
+          setExerciseError("Cannot delete exercise as a workout template references it");
+        } else {
+          setExerciseError("Cannot delete exercise as something references it that restricts deletion");
+        }
+      } else {
+        setExerciseError(msg);
+      }
     }
   };
 
@@ -291,7 +312,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
     } finally {
       setEditting(false);
     }
-    void performSearch(searchQuery, selectedTags);
+    void performSearch(searchQuery, selectedTags, searchOnlyUserCreated);
   };
 
   const handleEditExercise = async () => {
@@ -342,7 +363,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
     } finally {
       setEditting(false);
     }
-    void performSearch(searchQuery, selectedTags);
+    void performSearch(searchQuery, selectedTags, searchOnlyUserCreated);
   };
 
   const loadVolumesForExercise = async (exercise: ExerciseRow) => {
@@ -392,7 +413,6 @@ export function ExerciseModal(props: ExerciseModalProps) {
   const updateVolumeField = (
     muscleId: MuscleGroup,
     value: number,
-    textDisplay: string,
   ) => {
     if (!allowEditExercises) return;
     setSelectedExerciseForVolumeMuscleToVolume((prev) => {
@@ -408,7 +428,6 @@ export function ExerciseModal(props: ExerciseModalProps) {
         [muscleId]: {
           ...current[muscleId],
           value,
-          textDisplay,
         },
       };
     });
@@ -457,7 +476,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
           });
         } else {
           await addExerciseMuscleVolume({
-            muscle_id: muscleId,
+            muscle_id: muscleId as MuscleGroup,
             exercise_id: selectedExerciseForVolume.id,
             volume_factor: volumeRow.value,
             user_id: user.user_id,
@@ -606,6 +625,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
           style={{
             flexDirection: "row",
             gap: 2,
+            marginTop: spacing.xs,
           }}
         >
           {item.tags.map((tag) => (
@@ -636,8 +656,8 @@ export function ExerciseModal(props: ExerciseModalProps) {
         <View
           style={{
             flexDirection: "row",
-            marginTop: 12,
-            gap: 8,
+            marginTop: spacing.sm,
+            gap: spacing.xs,
           }}
         >
           <Selection
@@ -745,119 +765,13 @@ export function ExerciseModal(props: ExerciseModalProps) {
                         </Text>
 
                         {/* Add/subtract button at end */}
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "flex-end",
-                            width: 130,
-                          }}
-                        >
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              borderRadius: 999,
-                              borderWidth: 1,
-                              borderColor: colors.border,
-                              backgroundColor: colors.surfaceAlt,
-                              paddingHorizontal: 4,
-                              paddingVertical: 2,
-                            }}
-                          >
-                            {/* Minus */}
-                            {allowEditExercises && (
-                              <Pressable
-                                onPress={() => {
-                                  if (!allowEditExercises) {
-                                    return;
-                                  }
-                                  const current = entry?.value ?? 0;
-                                  const next = Math.max(
-                                    0,
-                                    parseFloat((current - 0.1).toFixed(1)),
-                                  );
-                                  updateVolumeField(
-                                    name,
-                                    next,
-                                    next.toFixed(1),
-                                  );
-                                }}
-                                disabled={!allowEditExercises}
-                                style={{
-                                  width: 22,
-                                  height: 22,
-                                  borderRadius: 999,
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  backgroundColor: colors.fadedPrimary,
-                                  marginRight: 4,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 12,
-                                    color: colors.textPrimary,
-                                  }}
-                                >
-                                  -
-                                </Text>
-                              </Pressable>
-                            )}
-
-                            {/* Value */}
-                            <Text
-                              style={{
-                                fontSize: 16,
-                                minWidth: 40,
-                                textAlign: "center",
-                                color: colors.textPrimary,
-                              }}
-                            >
-                              {entry?.value ?? 0}
-                            </Text>
-
-                            {/* Plus */}
-                            {allowEditExercises && (
-                              <Pressable
-                                onPress={() => {
-                                  if (!allowEditExercises) {
-                                    return;
-                                  }
-                                  const current = entry?.value ?? 0;
-                                  const next = Math.min(
-                                    1,
-                                    parseFloat((current + 0.1).toFixed(1)),
-                                  );
-                                  updateVolumeField(
-                                    name,
-                                    next,
-                                    next.toFixed(1),
-                                  );
-                                }}
-                                disabled={!allowEditExercises}
-                                style={{
-                                  width: 22,
-                                  height: 22,
-                                  borderRadius: 999,
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  backgroundColor: colors.fadedPrimary,
-                                  marginLeft: 4,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 12,
-                                    color: colors.textPrimary,
-                                  }}
-                                >
-                                  +
-                                </Text>
-                              </Pressable>
-                            )}
-                          </View>
-                        </View>
+                        <ModalPicker
+                          title={`Choose exercise volume for ${muscleGroup.display_name}`}
+                          options={[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map(n => {return {label: n !== null ? n.toFixed(1): '0.0', value: n}})}
+                          value={entry.value}
+                          onChange={(value) => updateVolumeField(name, value)}
+                          pressableProps={{ style: {alignSelf: 'flex-end'}, disabled: !allowEditExercises }}
+                        />
                       </View>
                     </View>
                   );
@@ -878,6 +792,11 @@ export function ExerciseModal(props: ExerciseModalProps) {
                 }
               />
             )}
+            <Button
+              title="Exit volumes"
+              onPress={() => handleSelectForVolumes(null)}
+              variant="secondary"
+            />
           </>
         )}
       </View>
@@ -916,7 +835,6 @@ export function ExerciseModal(props: ExerciseModalProps) {
                 borderColor: borderColor,
                 backgroundColor: backgroundColor,
                 marginRight: 4,
-                marginLeft: idx === 0 ? 8 : undefined,
               }}
             >
               <Pressable onPress={onPress}>
@@ -950,6 +868,12 @@ export function ExerciseModal(props: ExerciseModalProps) {
           Filter by tags (must match all):
         </Text>
         {renderSelectTags()}
+        <Selection
+          title="Created By You"
+          onPress={() => setSearchOnlyUserCreated(!searchOnlyUserCreated)}
+          isSelected={searchOnlyUserCreated}
+          style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
+        />
         <View
           style={{
             height: 2,

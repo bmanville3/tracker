@@ -4,7 +4,7 @@ import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import { ExerciseMuscleRow, ExerciseRow, UUID } from "../types";
 import { ExerciseAndMuscleTag, MuscleGroup } from "../types/enums";
-import { isSubsetOf, showAlert } from "../utils";
+import { isSubsetOf } from "../utils";
 
 // this data is rarely changed
 // no reason to refetch it all the time
@@ -25,10 +25,7 @@ export async function fetchExercises(): Promise<Map<UUID, ExerciseRow>> {
   return EXERCISE_CACHE.fetch(async () => {
     console.log("Fetching the exercise table from the database...");
     const { data, error } = await supabase.from("exercise").select("*");
-    if (error) {
-      showAlert("Error fetching exercises from database", error.message);
-      throw error;
-    }
+    if (error) throw error;
     return data satisfies ExerciseRow[];
   });
 }
@@ -42,10 +39,7 @@ export async function addExercise(
     .select("*")
     .single();
 
-  if (error) {
-    showAlert("Error adding exercise to database", error.message);
-    throw error;
-  }
+  if (error) throw error;
 
   EXERCISE_CACHE.upsert(data satisfies ExerciseRow);
 }
@@ -63,22 +57,18 @@ export async function updateExercise(args: {
     .select("*")
     .single();
 
-  if (error) {
-    showAlert("Error updating exercise in database", error.message);
-    throw error;
-  }
+  if (error) throw error;
 
   EXERCISE_CACHE.upsert(data satisfies ExerciseRow);
 }
 
 export async function deleteExercise(id: UUID): Promise<void> {
   const { error } = await supabase.from("exercise").delete().eq("id", id);
-  if (error) {
-    showAlert("Error deleting exercise from database", error.message);
-    throw error;
-  }
+  if (error) throw error;
 
   EXERCISE_CACHE.delete(id);
+  const idsToDelete = [...EXERCISE_MUSCLE_CACHE.getInnerMap().values()].filter(s => s.exercise_id === id).map(s => s.id);
+  idsToDelete.forEach(i => EXERCISE_MUSCLE_CACHE.delete(i))
 }
 
 export async function fetchAllExerciseMuscleVolumes(): Promise<
@@ -87,13 +77,7 @@ export async function fetchAllExerciseMuscleVolumes(): Promise<
   return EXERCISE_MUSCLE_CACHE.fetch(async () => {
     console.log("Fetching the exercise muscle table from the database...");
     const { data, error } = await supabase.from("exercise_muscle").select("*");
-    if (error) {
-      showAlert(
-        "Error fetching exercise muscle volume from database",
-        error.message,
-      );
-      throw error;
-    }
+    if (error) throw error;
     return data satisfies ExerciseMuscleRow[];
   });
 }
@@ -128,9 +112,6 @@ export async function addExerciseMuscleVolume(args: {
   user_id: UUID;
 }): Promise<void> {
   if (args.volume_factor < 0 || args.volume_factor > 1) {
-    showAlert(
-      `Volume factor should be between 0 and 1. Got ${args.volume_factor}`,
-    );
     throw new Error(
       `Volume should be between 0 and 1. Got ${args.volume_factor}`,
     );
@@ -141,10 +122,7 @@ export async function addExerciseMuscleVolume(args: {
     .select("*")
     .single();
 
-  if (error) {
-    showAlert("Error adding exercise muscle volume to database", error.message);
-    throw error;
-  }
+  if (error) throw error;
 
   EXERCISE_MUSCLE_CACHE.upsert(data satisfies ExerciseMuscleRow);
 }
@@ -162,13 +140,7 @@ export async function updateExerciseMuscleVolume(args: {
     .select("*")
     .single();
 
-  if (error) {
-    showAlert(
-      "Error updating exercise muscle volume in database",
-      error.message,
-    );
-    throw error;
-  }
+  if (error) throw error;
 
   EXERCISE_MUSCLE_CACHE.upsert(data satisfies ExerciseMuscleRow);
 }
@@ -179,13 +151,7 @@ export async function deleteExerciseMuscleVolume(id: UUID): Promise<void> {
     .delete()
     .eq("id", id);
 
-  if (error) {
-    showAlert(
-      "Error deleting exercise muscle volume from database",
-      error.message,
-    );
-    throw error;
-  }
+  if (error) throw error;
 
   EXERCISE_MUSCLE_CACHE.delete(id);
 }
@@ -255,14 +221,20 @@ export function getExerciseWithState(id: UUID): ExerciseRow | null {
   const [ex, setEx] = React.useState<ExerciseRow | null>(null);
 
   React.useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
         const exercise = await getExerciseAsync(id);
-        setEx(exercise);
-      } catch (e) {
-        setEx(null);
+        if (!cancelled) setEx(exercise);
+      } catch {
+        if (!cancelled) setEx(null);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   return ex;

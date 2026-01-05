@@ -225,3 +225,11 @@ export function tripleArraysEqual<T>(
   }
   return true;
 }
+
+export function anyErrorToString(e: any, fallback: string): string {
+  return e instanceof Error
+      ? e.message
+      : typeof e === "string"
+      ? e
+      : (e as any)?.message || fallback;
+}
