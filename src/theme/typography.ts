@@ -2,17 +2,17 @@ import { colors } from "./colors";
 
 export const typography = {
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "700" as const,
     color: colors.textPrimary,
   },
   section: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "700" as const,
     color: colors.textPrimary,
   },
   subsection: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700" as const,
     color: colors.textPrimary,
   },

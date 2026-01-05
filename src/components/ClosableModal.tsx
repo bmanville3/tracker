@@ -14,7 +14,7 @@ import {
   ViewStyle,
 } from "react-native";
 
-type ClosableModalProps = ModalProps & {
+export type ClosableModalProps = ModalProps & {
   children: React.ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
 };

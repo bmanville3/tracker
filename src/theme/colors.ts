@@ -26,4 +26,5 @@ export const colors = {
   error: "#DC2626",
   revert: "#DC2626",
   selection: "#4f46e5",
+  fadedSelection: "rgba(79, 70, 229, 0.15)",
 };

@@ -1,14 +1,21 @@
 import { Button, Screen } from "@/src/components";
+import { RpeTableModal } from "@/src/components/RPEChart";
 import { ExerciseModal } from "@/src/screens/ExerciseModal";
 import { useState } from "react";
 
 export default function HomeScreen() {
+  const [displayRpeChart, setDisplayRpeChart] = useState<boolean>(false);
   const [openExerciseEditor, setOpenExerciseEditor] = useState<boolean>(false);
+  
   return (
     <Screen>
       <Button
         title={"Exercise Catalog"}
         onPress={() => setOpenExerciseEditor(true)}
+      />
+      <Button
+        title={"RPE Calculator"}
+        onPress={() => setDisplayRpeChart(true)}
       />
       <ExerciseModal
         allowCreateExercises={true}
@@ -19,7 +26,11 @@ export default function HomeScreen() {
         onRequestClose={() => {
           setOpenExerciseEditor(false);
         }}
-      ></ExerciseModal>
+      />
+      <RpeTableModal
+        visible={displayRpeChart}
+        onRequestClose={() => setDisplayRpeChart(false)}
+      />
     </Screen>
   );
 }

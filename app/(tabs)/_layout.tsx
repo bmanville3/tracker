@@ -20,6 +20,16 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
+        name="analytics"
+        options={{
+          title: "Analytics",
+          tabBarIcon: ({ size, color }) => (
+            <Ionicons name="analytics" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="log"
         options={{
           title: "Log",
