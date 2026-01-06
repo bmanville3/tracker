@@ -17,12 +17,13 @@ async function fetchAllMuscleGroupsFromDb(): Promise<MuscleGroupRow[]> {
     showAlert("Error fetching muscle groups from database", error.message);
     throw error;
   }
-  return data as MuscleGroupRow[];
+  return data;
 }
 
 export async function fetchMuscleGroups(): Promise<
   Map<MuscleGroup, MuscleGroupRow>
 > {
+  // we know this will have keys of MuscleGroups since they are the id
   return (await MUSCLE_CACHE.fetch(fetchAllMuscleGroupsFromDb)) as Map<
     MuscleGroup,
     MuscleGroupRow

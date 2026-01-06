@@ -8,17 +8,19 @@ import {
 } from "react-native";
 
 import {
+  deleteWorkoutLog,
   fetchLastNWorkoutLogs,
   FullAttachedWorkoutLog,
 } from "@/src/api/workoutLogApi";
 import { FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
-import { Button, Screen } from "@/src/components";
+import { Button, ClosableModal, Screen } from "@/src/components";
 import { ErrorBanner } from "@/src/components/ErrorBanner";
 import { logWorkoutStrategy } from "@/src/screens/workout/LogWorkoutEditorStrategy";
 import { WorkoutView } from "@/src/screens/workout/WorkoutView";
 import { colors, spacing, typography } from "@/src/theme";
 import { UUID } from "@/src/types";
-import { anyErrorToString } from "@/src/utils";
+import { anyErrorToString, showAlert } from "@/src/utils";
+import { Feather } from "@expo/vector-icons";
 
 export default function WorkoutLogIndex() {
   // WorkoutView modal-ish state
@@ -27,6 +29,8 @@ export default function WorkoutLogIndex() {
   const [fromWorkout, setFromWorkout] =
     useState<FullDetachedWorkoutForMode<"log"> | null>(null);
   const [updateId, setUpdateId] = useState<UUID | null>(null);
+  const [allowEdit, setAllowEdit] = useState<boolean>(false);
+  const [confirmDelete, setConfirmDelete] = useState<FullAttachedWorkoutLog | null>(null);
 
   const [displayedWorkouts, setDisplayedWorkouts] = useState<
     FullAttachedWorkoutLog[]
@@ -48,6 +52,8 @@ export default function WorkoutLogIndex() {
         setFromWorkout(null);
         setWorkoutViewIsActive(false);
         setUpdateId(null);
+        setConfirmDelete(null);
+        setAllowEdit(false);
 
         await reloadWorkouts();
       } catch (e: any) {
@@ -65,7 +71,7 @@ export default function WorkoutLogIndex() {
       for (const i in fw.exercises) {
         const ex = fw.exercises[i];
         const sets = fw.sets[i];
-        names.push(`${sets.length} Sets - ${ex.exercise.name}`);
+        names.push(`${ex.exercise.name} \u00D7 ${sets.length} Set${sets.length === 1 ? '' : 's'}`);
         if (names.length >= 2) break;
       }
 
@@ -85,14 +91,23 @@ export default function WorkoutLogIndex() {
   function openCreateWorkout() {
     setFromWorkout(null);
     setUpdateId(null);
+    setAllowEdit(true);
     setWorkoutViewIsActive(true);
   }
 
   function openEditWorkout(fullWorkout: FullAttachedWorkoutLog) {
+    setAllowEdit(true);
     setWorkoutViewIsActive(true);
     const { logId, ...rest } = fullWorkout;
     setFromWorkout(rest satisfies FullDetachedWorkoutForMode<"log">);
     setUpdateId(logId satisfies UUID);
+  }
+
+  function openViewWorkout(fullWorkout: FullAttachedWorkoutLog) {
+    setAllowEdit(false);
+    setWorkoutViewIsActive(true);
+    const { logId, ...rest } = fullWorkout;
+    setFromWorkout(rest satisfies FullDetachedWorkoutForMode<"log">);
   }
 
   if (workoutViewIsActive) {
@@ -101,7 +116,7 @@ export default function WorkoutLogIndex() {
         isActive={workoutViewIsActive}
         onSuccessfulSave={reloadWorkouts}
         requestClose={() => setWorkoutViewIsActive(false)}
-        allowEditing={true}
+        allowEditing={allowEdit}
         loadWithExisting={fromWorkout}
         updateWorkoutId={updateId}
         strategy={logWorkoutStrategy}
@@ -122,6 +137,8 @@ export default function WorkoutLogIndex() {
           <Text style={styles.headerTitle}>Workout Log</Text>
           <Text style={styles.headerSubtitle}>
             Review and manage your recent training sessions.
+            {"\n"}
+            Click on a workout to view it.
           </Text>
         </View>
 
@@ -154,24 +171,55 @@ export default function WorkoutLogIndex() {
 
             return (
               <Pressable
-                key={`${fw.logId}`}
-                onPress={() => openEditWorkout(fw)}
+                key={fw.logId}
+                onPress={() => openViewWorkout(fw)}
                 style={styles.workoutCard}
               >
-                {/* Date / Name */}
-                <Text style={styles.workoutDateText}>
-                  {w.completed_on ?? "Uncompleted workout"}
+                {/* Header row: date/name + icons */}
+                <View style={styles.workoutHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={typography.hint}>
+                      {w.completed_on ?? "Uncompleted workout"}
+                    </Text>
+                    {w.name ? (
+                      <Text style={typography.subsection}>{w.name}</Text>
+                    ) : (
+                      <Text style={typography.subsection}>Untitled Workout</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.iconRow}>
+                    {/* Edit icon */}
+                    <Pressable
+                      hitSlop={8}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        openEditWorkout(fw);
+                      }}
+                    >
+                      <Feather name="edit-2" size={22} />
+                    </Pressable>
+
+                    {/* Delete icon */}
+                    <Pressable
+                      hitSlop={8}
+                      style={{ marginLeft: 8 }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setConfirmDelete(fw);
+                      }}
+                    >
+                      <Feather name="trash-2" size={22} />
+                    </Pressable>
+                  </View>
+                </View>
+                <Text style={typography.hint}>
+                  {fw.exercises.length} Exercise{fw.exercises.length === 1 ? '' : 's'}
                 </Text>
-                {w.name ? (
-                  <Text style={styles.workoutNameText}>{w.name}</Text>
-                ) : "Untitled Workout"}
 
                 {/* Preview of exercises */}
                 <Text
-                  style={[
-                    styles.workoutPreviewText,
-                    { opacity: preview ? 1 : 0.6 },
-                  ]}
+                  style={typography.hint}
                 >
                   {preview || "No exercises logged"}
                 </Text>
@@ -179,7 +227,7 @@ export default function WorkoutLogIndex() {
                 {/* Notes */}
                 {w.notes ? (
                   <Text style={styles.workoutNotesText} numberOfLines={2}>
-                    {w.notes}
+                    Notes: {w.notes}
                   </Text>
                 ) : null}
               </Pressable>
@@ -201,11 +249,54 @@ export default function WorkoutLogIndex() {
           </View>
         )}
       </View>
+      <ClosableModal
+        visible={confirmDelete !== null}
+      >
+        <Text style={{...typography.section, marginBottom: 10}}>
+          Delete Workout Log: "{confirmDelete?.workout.name}" completed on {confirmDelete?.workout.completed_on}
+        </Text>
+        <Button
+          title={"Cancel Delete"}
+          variant="primary"
+          onPress={() => setConfirmDelete(null)}
+          disabled={loading}
+        />
+        <Button
+          title={"Confirm Delete"}
+          variant="revert"
+          onPress={() => {
+            if (confirmDelete === null) {
+              return;
+            }
+            setLoading(true);
+            deleteWorkoutLog(confirmDelete.logId)
+              .then(() => {
+                setDisplayedWorkouts(displayedWorkouts.filter(f => f.logId !== confirmDelete.logId))
+                showAlert("Log successfully deleted");
+              })
+              .catch((e) => setErrorText(anyErrorToString(e, 'Error deleting workout log')))
+              .finally(() => {
+                setConfirmDelete(null);
+                setLoading(false);
+              })
+          }}
+          disabled={loading}
+        />
+      </ClosableModal>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  workoutHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -252,19 +343,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
     marginBottom: spacing.sm,
-  },
-  workoutDateText: {
-    ...typography.hint,
-    color: colors.textSecondary,
-  },
-  workoutNameText: {
-    ...typography.body,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  workoutPreviewText: {
-    ...typography.body,
-    marginTop: 6,
   },
   workoutNotesText: {
     ...typography.hint,

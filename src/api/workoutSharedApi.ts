@@ -10,7 +10,7 @@ import {
   WorkoutLogRow,
   WorkoutTemplateRow,
 } from "../types";
-import { arraysEqual, doubleArraysEqual } from "../utils";
+import { arraysEqual, doubleArraysEqual, OmitNever } from "../utils";
 
 export type WorkoutEditorMode = "template" | "log";
 
@@ -26,27 +26,26 @@ export type ModeTypes<M extends WorkoutEditorMode> = M extends "template"
       SetRow: WorkoutExerciseSetLogRow;
     };
 
-export type CompleteProgram = Omit<AssociatedProgramFields, "program_id"> & {
+export type CompleteProgram = OmitNever<AssociatedProgramFields, "program_id"> & {
   program_row: ProgramRow;
 };
 
 export type EditableProgramFields<M extends WorkoutEditorMode> =
   M extends "template" ? CompleteProgram : AllOrNothing<CompleteProgram>;
 
-export type EditableWorkout<M extends WorkoutEditorMode> = Omit<
-  ModeTypes<M>["WorkoutRow"],
-  "id" | keyof AssociatedProgramFields
-> &
-  EditableProgramFields<M>;
+export type EditableWorkout<M extends WorkoutEditorMode> =
+  Omit<ModeTypes<M>["WorkoutRow"], 'id' | keyof AssociatedProgramFields>
+  & EditableProgramFields<M>
+  & {'id'?: never};
 
-export type EditableExercise<M extends WorkoutEditorMode> = Omit<
+export type EditableExercise<M extends WorkoutEditorMode> = OmitNever<
   ModeTypes<M>["ExerciseRow"],
   "id" | "workout_id" | "exercise_id" | "exercise_index"
 > & {
   exercise: ExerciseRow;
 };
 
-export type EditableSet<M extends WorkoutEditorMode> = Omit<
+export type EditableSet<M extends WorkoutEditorMode> = OmitNever<
   ModeTypes<M>["SetRow"],
   "id" | "workout_exercise_id" | "set_index"
 >;

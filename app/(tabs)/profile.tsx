@@ -2,7 +2,7 @@ import { Button, RadioRow, Screen, TextField } from "@/src/components";
 import { supabase } from "@/src/supabase";
 import { typography } from "@/src/theme";
 import { ProfileRow } from "@/src/types";
-import { DistanceUnit, WeightUnit } from "@/src/types/enums";
+import { DISTANCE_UNITS, DistanceUnit, WeightUnit } from "@/src/types/enums";
 import { logOut, PROFILE_CACHE, requireGetUser, showAlert } from "@/src/utils";
 import { useEffect, useMemo, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
@@ -131,7 +131,7 @@ export default function Profile() {
       />
 
       <Text style={typography.label}>Default Distance Unit</Text>
-      {(["ft", "yd", "mi", "m", "km"] as const).map((u) => (
+      {DISTANCE_UNITS.map((u) => (
         <RadioRow
           key={u}
           label={

@@ -37,6 +37,7 @@ export function rpeChartPercentageOfMax(reps: number, rpe?: RPE): number | null 
   const table = RPE_TABLE[rpe ?? 10];
 
   if (Number.isInteger(reps)) {
+    // is an integer and within range -> has corresponding index
     return table[reps as RpeTableReps];
   }
 

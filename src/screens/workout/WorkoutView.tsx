@@ -33,12 +33,11 @@ import {
   DistanceUnit,
   ExerciseRow,
   PERFORMANCE_TYPES,
-  RPE,
   RPES,
   SET_TYPES,
   UUID,
   WEIGHT_UNITS,
-  WeightUnit,
+  WeightUnit
 } from "@/src/types";
 import {
   arraysEqual,
@@ -221,7 +220,11 @@ export function WorkoutView<M extends WorkoutEditorMode>(
         >
           <TextField
             value={workout.name}
-            onChangeText={(text) => setWorkout({ ...workout, name: text })}
+            onChangeText={(text) => {
+              const newWorkout: EditableWorkout<M> = {...workout};
+              newWorkout.name = text;
+              setWorkout(newWorkout);
+            }}
             placeholder="Untitled workout"
             placeholderTextColor={colors.placeholderTextColor}
             style={{
@@ -229,11 +232,11 @@ export function WorkoutView<M extends WorkoutEditorMode>(
               flex: 1,
               paddingVertical: 1,
             }}
-            editable={isLoading || allowEditing}
+            editable={!isLoading && allowEditing}
           />
         </View>
         {!allowEditing && (
-          <Text style={{ ...typography.hint, marginBottom: 10 }}>
+          <Text style={{ ...typography.subsection, marginBottom: 10 }}>
             Editing disabled
           </Text>
         )}
@@ -310,7 +313,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                   borderColor: colors.border,
                   textAlign: "center",
                 }}
-                editable={isLoading || allowEditing}
+                editable={!isLoading && allowEditing}
               />
             </View>
 
@@ -351,7 +354,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                   textAlign: "center",
                 }}
                 numberType={"float"}
-                editable={isLoading || allowEditing}
+                editable={!isLoading && allowEditing}
               />
             </View>
           </View>
@@ -373,6 +376,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 title={u}
                 isSelected={selected}
                 onPress={() => setWeightUnit(u)}
+                disabled={isLoading || !allowEditing}
               />
             );
           })}
@@ -387,6 +391,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 title={u}
                 isSelected={selected}
                 onPress={() => setDistanceUnit(u)}
+                disabled={isLoading || !allowEditing}
               />
             );
           })}
@@ -402,7 +407,11 @@ export function WorkoutView<M extends WorkoutEditorMode>(
         <TextField
           multiline
           value={workout.notes ?? ""}
-          onChangeText={(text) => setWorkout({ ...workout, notes: text })}
+          onChangeText={(text) => {
+            const newWorkout = {...workout};
+            newWorkout.notes = text;
+            setWorkout(newWorkout);
+          }}
           placeholder="Any notes about this workout (RPE goals, cues, etc.)"
           placeholderTextColor={colors.placeholderTextColor}
           style={{
@@ -416,7 +425,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             paddingHorizontal: 8,
             paddingVertical: 6,
           }}
-          editable={isLoading || allowEditing}
+          editable={!isLoading && allowEditing}
         />
       </View>
     );
@@ -529,36 +538,11 @@ export function WorkoutView<M extends WorkoutEditorMode>(
 
     const rpeFieldRender = () => {
       return (
-        <NumberField
-          numberValue={set.rpe}
-          placeholder="6-10"
-          onChangeNumber={(value) => {
-            if (value === null) {
-              handleUpdateSetCurried("rpe", value);
-              return;
-            }
-            const roundedToPoint5 = Math.round(value * 2) / 2;
-            if (set.rpe === null) {
-              // if no number yet force into rpe range
-              // idea is to show what is allowed
-              if (roundedToPoint5 < 2) {
-                // assume trying to type 10
-                handleUpdateSetCurried("rpe", 10);
-                return;
-              }
-              const vAsRpe = Math.max(
-                Math.min(...RPES),
-                Math.min(roundedToPoint5, Math.max(...RPES)),
-              ) as RPE;
-              handleUpdateSetCurried("rpe", vAsRpe);
-            } else if (RPES.includes(roundedToPoint5 as any)) {
-              // if there is a number let user override
-              handleUpdateSetCurried("rpe", roundedToPoint5 as RPE);
-            }
-          }}
-          numberType="float"
-          editable={isLoading || allowEditing}
-          style={{ padding: 4 }}
+        <ModalPicker
+          options={[...RPES.map(r => {return {label: r.toString(), value: r}}), {label: 'RPE', value: null}]}
+          onChange={(value) => handleUpdateSetCurried("rpe", value)}
+          pressableProps={{  style: { padding: 4 }, disabled: isLoading || !allowEditing }}
+          value={set.rpe}
         />
       );
     };
@@ -575,7 +559,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             handleUpdateSetCurried("reps", value);
           }}
           numberType="float"
-          editable={isLoading || allowEditing}
+          editable={!isLoading && allowEditing}
           style={{ padding: 4 }}
         />
       );
@@ -603,6 +587,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             value={set.set_type}
             onChange={(v) => handleUpdateSetCurried("set_type", v)}
             textProps={{ style: typography.hint }}
+            pressableProps={{ disabled: isLoading || !allowEditing }}
           />
           {isTemplateSet(set) && (
             <ModalPicker
@@ -618,6 +603,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
               value={set.performance_type}
               onChange={(v) => handleUpdateSetCurried("performance_type", v)}
               textProps={{ style: typography.hint }}
+              pressableProps={{ disabled: isLoading || !allowEditing }}
             />
           )}
           <View style={{ marginLeft: "auto", flexDirection: "row", gap: 0 }}>
@@ -709,7 +695,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 handleUpdateSetCurried("percentage_of_max", value)
               }
               numberType="float"
-              editable={isLoading || allowEditing}
+              editable={!isLoading && allowEditing}
               style={{ padding: 4 }}
             />
           </View>
@@ -771,7 +757,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 handleUpdateSetCurried("weight", value)
               }
               numberType={"float"}
-              editable={isLoading || allowEditing}
+              editable={!isLoading && allowEditing}
               style={{ padding: 4 }}
             />
           </View>
@@ -791,6 +777,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                   title={u}
                   isSelected={u === set.weight_unit}
                   onPress={() => handleUpdateSetCurried("weight_unit", u)}
+                  disabled={isLoading || !allowEditing}
                 />
               );
             })}
@@ -852,7 +839,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 }
                 numberType="int"
                 style={{ fontSize: 13, padding: 4 }}
-                editable={isLoading || allowEditing}
+                editable={!isLoading && allowEditing}
               />
             </View>
 
@@ -868,7 +855,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 }
                 numberType="int"
                 style={{ fontSize: 13, padding: 4 }}
-                editable={isLoading || allowEditing}
+                editable={!isLoading && allowEditing}
               />
             </View>
           </View>
@@ -1038,6 +1025,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                       }
                       handleUpdateExercise(exerciseIdx, "superset_group", 1);
                     }}
+                    disabled={isLoading || !allowEditing}
                   />
                   {ex.superset_group !== null && (
                     <View style={{ width: 40 }}>
@@ -1061,7 +1049,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                           marginLeft: 6,
                           padding: 4,
                         }}
-                        editable={isLoading || allowEditing}
+                        editable={!isLoading && allowEditing}
                       />
                     </View>
                   )}
@@ -1075,6 +1063,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                         color: colors.textOnPrimary,
                       },
                     }}
+                    disabled={!allowEditing}
                   />
                   {exerciseIdx !== 0 && (
                     <Button
@@ -1264,15 +1253,15 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           gap: 8,
         }}
       >
-        <View style={{ flex: 1 }}>
+        {allowEditing && <View style={{ flex: 1 }}>
           <Button
             title={`${updateWorkoutId !== null ? "Update" : "Create"} ${isTemplateWorkout(workout) ? "Template" : "Log"}`}
             onPress={handleSave}
             disabled={!isSavable || isLoading || !allowEditing}
           />
-        </View>
+        </View>}
         <View style={{ flex: 1 }}>
-          <Button title="Exit" onPress={requestClose} variant="secondary" />
+          <Button title="Exit" onPress={requestClose} variant={allowEditing ? "secondary" : "primary"} />
         </View>
       </View>
     </Screen>

@@ -45,9 +45,9 @@ export class SwrKeyedCache<V> implements CacheHandle {
     const existing = this.store.get(key);
     if (existing) return existing;
     const e: CacheState<V> = {
-      value: null as V | null,
-      lastFetchedMs: null as number | null,
-      inFlight: null as Promise<V> | null,
+      value: null,
+      lastFetchedMs: null,
+      inFlight: null,
     };
     this.store.set(key, e);
     return e;

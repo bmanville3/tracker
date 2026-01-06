@@ -4,7 +4,7 @@ import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import { ExerciseMuscleRow, ExerciseRow, UUID } from "../types";
 import { ExerciseAndMuscleTag, MuscleGroup } from "../types/enums";
-import { isSubsetOf } from "../utils";
+import { isSubsetOf, OmitNever } from "../utils";
 
 // this data is rarely changed
 // no reason to refetch it all the time
@@ -31,7 +31,7 @@ export async function fetchExercises(): Promise<Map<UUID, ExerciseRow>> {
 }
 
 export async function addExercise(
-  args: Omit<ExerciseRow, "id">,
+  args: OmitNever<ExerciseRow, "id">,
 ): Promise<void> {
   const { data, error } = await supabase
     .from("exercise")

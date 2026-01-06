@@ -43,9 +43,9 @@ export async function getUser(): Promise<ProfileRow | null> {
         showAlert("No profile found. Please contact bmanville03@gmail.com.");
         throw new Error("No profile found");
       }
-      const fetchedProfile: ProfileRow = profile as ProfileRow;
+      const fetchedProfile: ProfileRow = profile;
       return [
-        { ...fetchedProfile, id: fetchedProfile.user_id } as WrappedProfile,
+        { ...fetchedProfile, id: fetchedProfile.user_id },
       ];
     });
     return [...wrappedProfile.values()].at(0) ?? null;
@@ -170,7 +170,7 @@ export function toISODate(d: Date): ISODate {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}` as ISODate;
+  return `${y}-${m}-${day}`;
 }
 
 export function todayISO(): ISODate {
@@ -231,5 +231,10 @@ export function anyErrorToString(e: any, fallback: string): string {
       ? e.message
       : typeof e === "string"
       ? e
-      : (e as any)?.message || fallback;
+      : e?.message || fallback;
 }
+
+export type OmitNever<T, K extends keyof T> =
+  Omit<T, K> & {
+    [P in K]?: never;
+  };

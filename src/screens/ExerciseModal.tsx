@@ -94,9 +94,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
 
   const [mode, setMode] = useState<"Search" | "Create" | "Edit">("Search");
 
-  const [muscleGroups, setMuscleGroups] = useState<
-    Record<MuscleGroup, MuscleGroupRow>
-  >({} as Record<MuscleGroup, MuscleGroupRow>);
+  const [muscleGroups, setMuscleGroups] = useState<Map<MuscleGroup, MuscleGroupRow>>(new Map());
   const [loadingExercises, setLoadingExercises] = useState(false);
   const [exerciseError, setExerciseError] = useState<string | null>(null);
   const [exercises, setExercises] = useState<ExerciseRow[]>([]);
@@ -184,12 +182,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
   };
 
   const loadMuscleGroups = async () => {
-    return setMuscleGroups(
-      Object.fromEntries(await fetchMuscleGroups()) as Record<
-        MuscleGroup,
-        MuscleGroupRow
-      >,
-    );
+    return setMuscleGroups(await fetchMuscleGroups());
   };
 
   const resetAll = () => {
@@ -461,10 +454,9 @@ export function ExerciseModal(props: ExerciseModalProps) {
         return;
       }
 
-      for (const idAndVolumeRow of Object.entries(
+      for (const [muscleId, volumeRow] of Object.entries(
         selectedExerciseForVolumeMuscleToVolume,
       )) {
-        const [muscleId, volumeRow] = idAndVolumeRow;
         if (volumeRow.value < 0 || volumeRow.value > 1) {
           showAlert(`Volume must be between 0 and 1. Got ${volumeRow.value}`);
           return;
@@ -736,7 +728,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
                   if (!allowEditExercises && entry.value === 0) {
                     return null;
                   }
-                  const muscleGroup = muscleGroups[name];
+                  const muscleGroup: MuscleGroupRow | undefined = muscleGroups.get(name);
                   return (
                     <View key={name}>
                       {/* Add a line between each item*/}
@@ -761,12 +753,12 @@ export function ExerciseModal(props: ExerciseModalProps) {
                             fontSize: 14,
                           }}
                         >
-                          {muscleGroup.display_name}
+                          {muscleGroup?.display_name ?? name}
                         </Text>
 
                         {/* Add/subtract button at end */}
                         <ModalPicker
-                          title={`Choose exercise volume for ${muscleGroup.display_name}`}
+                          title={`Choose exercise volume for ${muscleGroup?.display_name ?? name}`}
                           options={[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map(n => {return {label: n !== null ? n.toFixed(1): '0.0', value: n}})}
                           value={entry.value}
                           onChange={(value) => updateVolumeField(name, value)}
