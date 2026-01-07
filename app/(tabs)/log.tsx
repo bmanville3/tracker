@@ -251,6 +251,7 @@ export default function WorkoutLogIndex() {
       </View>
       <ClosableModal
         visible={confirmDelete !== null}
+        onRequestClose={() => setConfirmDelete(null)}
       >
         <Text style={{...typography.section, marginBottom: 10}}>
           Delete Workout Log: "{confirmDelete?.workout.name}" completed on {confirmDelete?.workout.completed_on}
