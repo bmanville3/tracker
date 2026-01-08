@@ -35,7 +35,9 @@ export type ModalPickerProps<T> = {
 
   textProps?: TextProps;
 
-  pressableProps?: Omit<PressableProps, "style"> & {
+  disabled?: boolean;
+
+  pressableProps?: Omit<PressableProps, "style" | "disabled"> & {
     style?: StyleProp<ViewStyle>;
   };
 };
@@ -46,6 +48,7 @@ export function ModalPicker<T>({
   value,
   onChange,
   placeholder = "Select...",
+  disabled = false,
   textProps,
   pressableProps,
 }: ModalPickerProps<T>) {
@@ -64,6 +67,7 @@ export function ModalPicker<T>({
       <Pressable
         style={[styles.field, pressStyle]}
         onPress={() => setVisible(true)}
+        disabled={disabled}
         {...pressRest}
       >
         <Text

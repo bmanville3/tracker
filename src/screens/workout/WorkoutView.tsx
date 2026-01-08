@@ -541,7 +541,8 @@ export function WorkoutView<M extends WorkoutEditorMode>(
         <ModalPicker
           options={[...RPES.map(r => {return {label: r.toString(), value: r}}), {label: 'RPE', value: null}]}
           onChange={(value) => handleUpdateSetCurried("rpe", value)}
-          pressableProps={{  style: { padding: 4 }, disabled: isLoading || !allowEditing }}
+          pressableProps={{  style: { padding: 4 } }}
+          disabled={isLoading || !allowEditing}
           value={set.rpe}
         />
       );
@@ -587,7 +588,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             value={set.set_type}
             onChange={(v) => handleUpdateSetCurried("set_type", v)}
             textProps={{ style: typography.hint }}
-            pressableProps={{ disabled: isLoading || !allowEditing }}
+            disabled={isLoading || !allowEditing}
           />
           {isTemplateSet(set) && (
             <ModalPicker
@@ -603,7 +604,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
               value={set.performance_type}
               onChange={(v) => handleUpdateSetCurried("performance_type", v)}
               textProps={{ style: typography.hint }}
-              pressableProps={{ disabled: isLoading || !allowEditing }}
+              disabled={isLoading || !allowEditing}
             />
           )}
           <View style={{ marginLeft: "auto", flexDirection: "row", gap: 0 }}>

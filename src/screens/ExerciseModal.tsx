@@ -5,6 +5,7 @@ import {
   addExercise,
   addExerciseMuscleVolume,
   deleteExercise,
+  deleteExerciseMuscleVolume,
   fetchAllExerciseMuscleVolumes,
   fetchExerciseMuscleVolumes,
   searchExercises,
@@ -46,19 +47,22 @@ type ExerciseModalProps = {
 };
 
 type VolumeEntry = {
-  row: ExerciseMuscleRow | null;
-  value: number;
+  existing_db_row: ExerciseMuscleRow | null;
+  new_value: number | null;
+  remove_existing_db_row: boolean;
 };
 type VolumeByMuscle = Record<MuscleGroup, VolumeEntry>;
 
 function volumeEntryEqual(a: VolumeEntry, b: VolumeEntry): boolean {
   if (a === b) return true;
 
-  if (a.row === null && b.row !== null) return false;
-  if (a.row !== null && b.row === null) return false;
-  if (a.row !== null && b.row !== null && a.row.id !== b.row.id) return false;
+  if (a.existing_db_row === null && b.existing_db_row !== null) return false;
+  if (a.existing_db_row !== null && b.existing_db_row === null) return false;
+  if (a.existing_db_row !== null && b.existing_db_row !== null
+    && a.existing_db_row.id !== b.existing_db_row.id) return false;
 
-  if (a.value !== b.value) return false;
+  if (a.new_value !== b.new_value) return false;
+  if (a.remove_existing_db_row !== b.remove_existing_db_row) return false;
 
   return true;
 }
@@ -123,6 +127,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
     selectedExerciseForVolumeMuscleToVolume,
     setSelectedExerciseForVolumeMuscleToVolume,
   ] = useState<VolumeByMuscle | null>(null);
+  const [muscleGroupsToRender, setMuscleGroupsToRender] = useState<MuscleGroup[]>([]);
 
   const initialVolumeValuesRef = useRef<VolumeByMuscle | null>(null);
 
@@ -187,6 +192,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
 
   const resetAll = () => {
     setExercises([]);
+    setMuscleGroupsToRender([]);
     setSelectedExerciseForVolume(null);
     setSearchQuery("");
     setNewName("");
@@ -370,19 +376,13 @@ export function ExerciseModal(props: ExerciseModalProps) {
 
       const records: VolumeByMuscle = MUSCLE_GROUPS.reduce((acc, mg) => {
         acc[mg] = {
-          row: null,
-          value: 0,
+          existing_db_row: map.get(mg) ?? null,
+          new_value: null,
+          remove_existing_db_row: false,
         };
         return acc;
       }, {} as VolumeByMuscle);
-
-      for (const row of map.values()) {
-        const mg = row.muscle_id;
-        records[mg] = {
-          row,
-          value: row.volume_factor,
-        };
-      }
+      setMuscleGroupsToRender([...map.keys()])
 
       setSelectedExerciseForVolumeMuscleToVolume(records);
       initialVolumeValuesRef.current = records;
@@ -405,24 +405,26 @@ export function ExerciseModal(props: ExerciseModalProps) {
 
   const updateVolumeField = (
     muscleId: MuscleGroup,
-    value: number,
+    new_value: number | null,
+    remove_existing_db_row: boolean,
   ) => {
     if (!allowEditExercises) return;
     setSelectedExerciseForVolumeMuscleToVolume((prev) => {
-      const current =
-        prev ??
-        MUSCLE_GROUPS.reduce((acc, mg) => {
-          acc[mg] = { row: null, value: 0 };
-          return acc;
-        }, {} as VolumeByMuscle);
+      if (prev === null) {
+        return prev;
+      }
 
-      return {
-        ...current,
-        [muscleId]: {
-          ...current[muscleId],
-          value,
-        },
+      const newVolumeEntry: VolumeEntry = {
+        ...prev[muscleId],
+        new_value: new_value,
+        remove_existing_db_row: remove_existing_db_row,
       };
+
+      const newState: VolumeByMuscle = {
+        ...prev,
+        [muscleId]: newVolumeEntry,
+      };
+      return newState;
     });
   };
 
@@ -434,16 +436,14 @@ export function ExerciseModal(props: ExerciseModalProps) {
     setVolumeError(null);
     try {
       const user = await requireGetUser();
-      if (!user) {
-        throw new Error("User is null");
-      }
+      if (!user) return;
 
       if (
         Object.values(selectedExerciseForVolumeMuscleToVolume).some(
           (volumeRow) => {
-            if (volumeRow.value < 0 || volumeRow.value > 1) {
+            if (volumeRow.new_value !== null && (volumeRow.new_value < 0 || volumeRow.new_value > 1)) {
               showAlert(
-                `Volume must be between 0 and 1. Got ${volumeRow.value}`,
+                `Volume must be between 0 and 1. Got ${volumeRow.new_value}`,
               );
               return true;
             }
@@ -457,22 +457,47 @@ export function ExerciseModal(props: ExerciseModalProps) {
       for (const [muscleId, volumeRow] of Object.entries(
         selectedExerciseForVolumeMuscleToVolume,
       )) {
-        if (volumeRow.value < 0 || volumeRow.value > 1) {
-          showAlert(`Volume must be between 0 and 1. Got ${volumeRow.value}`);
-          return;
+        // nothing to update
+        if (volumeRow.new_value === null && !volumeRow.remove_existing_db_row) {
+          continue;
         }
-        if (volumeRow.row !== null) {
-          await updateExerciseMuscleVolume({
-            id: volumeRow.row.id,
-            patch: { volume_factor: volumeRow.value },
-          });
-        } else {
+        if (volumeRow.remove_existing_db_row) {
+          if (volumeRow.existing_db_row === null) {
+            showAlert("Got remove existing db row as True but no row to remove");
+            continue;
+          } else if (volumeRow.existing_db_row.user_id === null) {
+            showAlert("Cannot remove system volume row. Please set it to 0 to override it");
+            continue;
+          } else {
+            await deleteExerciseMuscleVolume(volumeRow.existing_db_row.id);
+            continue;
+          }
+        // some of the following checks are only here to satisfy typescript
+        // we are guaranteed volumeRow.new_value !== null by above
+        } else if (volumeRow.existing_db_row === null && volumeRow.new_value !== null) {
           await addExerciseMuscleVolume({
             muscle_id: muscleId as MuscleGroup,
             exercise_id: selectedExerciseForVolume.id,
-            volume_factor: volumeRow.value,
+            volume_factor: volumeRow.new_value,
             user_id: user.user_id,
           });
+        // guaranteed volumeRow.existing_db_row !== null && volumeRow.new_value !== null by above
+        } else if (volumeRow.existing_db_row !== null && volumeRow.new_value !== null) {
+          if (volumeRow.existing_db_row.user_id === null) {
+            await addExerciseMuscleVolume({
+              muscle_id: muscleId as MuscleGroup,
+              exercise_id: selectedExerciseForVolume.id,
+              volume_factor: volumeRow.new_value,
+              user_id: user.user_id,
+            });
+          } else {
+            await updateExerciseMuscleVolume({
+              id: volumeRow.existing_db_row.id,
+              patch: { volume_factor: volumeRow.new_value },
+            });
+          }
+        } else {
+          throw new Error("Ended up in unknown branch of handle save volumes. Should not be possible");
         }
       }
 
@@ -723,28 +748,21 @@ export function ExerciseModal(props: ExerciseModalProps) {
 
             <View style={{ marginTop: 8 }}>
               {selectedExerciseForVolumeMuscleToVolume &&
-                MUSCLE_GROUPS.map((name) => {
+                muscleGroupsToRender.map((name) => {
                   const entry = selectedExerciseForVolumeMuscleToVolume[name];
-                  if (!allowEditExercises && entry.value === 0) {
-                    return null;
-                  }
                   const muscleGroup: MuscleGroupRow | undefined = muscleGroups.get(name);
                   return (
                     <View key={name}>
-                      {/* Add a line between each item*/}
-                      <View
-                        style={{
-                          height: 1,
-                          backgroundColor: colors.border,
-                          marginVertical: 4,
-                        }}
-                      />
-
                       <View
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
                           marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 999,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5
                         }}
                       >
                         <Text
@@ -756,19 +774,58 @@ export function ExerciseModal(props: ExerciseModalProps) {
                           {muscleGroup?.display_name ?? name}
                         </Text>
 
-                        {/* Add/subtract button at end */}
                         <ModalPicker
                           title={`Choose exercise volume for ${muscleGroup?.display_name ?? name}`}
-                          options={[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map(n => {return {label: n !== null ? n.toFixed(1): '0.0', value: n}})}
-                          value={entry.value}
-                          onChange={(value) => updateVolumeField(name, value)}
-                          pressableProps={{ style: {alignSelf: 'flex-end'}, disabled: !allowEditExercises }}
+                          options={(() => {
+                            const allOptions: {label: string, value: 'Delete' | 'Default' | number, description?: string}[]
+                              = [...[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map(n => {return {label: n.toFixed(1), value: n}})];
+                            if (entry.existing_db_row !== null && entry.existing_db_row.user_id !== null) {
+                              allOptions.push({label: 'Delete User Overwrite', value: 'Delete', description: 'Remove overwrites from database. Will revert back to system defined volume in database if present.'});
+                            }
+                            allOptions.push({
+                              label: entry.existing_db_row?.volume_factor.toFixed(1) ?? 'None',
+                              value: 'Default',
+                              description: entry.existing_db_row !== null
+                                ? `Default database value ${entry.existing_db_row.user_id !== null ? '(user defined)' : '(system defined)'}`
+                                : 'Default value is None - No saved volume value in database yet'
+                            });
+                            return allOptions;
+                          })()}
+                          value={entry.remove_existing_db_row ? 'Delete' : entry.new_value !== null ? entry.new_value : entry.existing_db_row !== null ? 'Default' : null}
+                          onChange={(value) => {
+                            if (value === 'Delete') {
+                              updateVolumeField(name, entry.new_value, true);
+                            } else if (value === 'Default') {
+                              updateVolumeField(name, null, false);
+                            } else if (typeof value === 'number') {
+                              if (entry.existing_db_row !== null && entry.existing_db_row.user_id !== null && value === entry.existing_db_row.volume_factor) {
+                                updateVolumeField(name, null, false);
+                              } else {
+                                updateVolumeField(name, value, false);
+                              }
+                            } else {
+                              showAlert(`Unknown change requested: ${value}. Changing nothing`);
+                            }
+                          }}
+                          pressableProps={{ style: {alignSelf: 'flex-end', backgroundColor: initialVolumeValuesRef.current !== null && !volumeEntryEqual(entry, initialVolumeValuesRef.current[name]) ? colors.fadedPrimaryOffset : undefined, borderRadius: 999} }}
+                          disabled={loadingVolumes || !allowEditExercises}
                         />
                       </View>
                     </View>
                   );
                 })}
             </View>
+
+            {allowEditExercises && MUSCLE_GROUPS.length != muscleGroupsToRender.length && (
+              <ModalPicker
+                title="Add Muscle Group Volume"
+                options={MUSCLE_GROUPS.filter(mg => !muscleGroupsToRender.includes(mg)).map(mg => {return {label: muscleGroups.get(mg)?.display_name ?? mg, value: mg}})}
+                value={null}
+                placeholder="Add Muscle Group"
+                onChange={(value) => setMuscleGroupsToRender([...muscleGroupsToRender, value])}
+                pressableProps={{ style: { alignSelf: 'flex-start', marginBottom: spacing.xs}}}
+              />
+            )}
 
             {allowEditExercises && (
               <Button

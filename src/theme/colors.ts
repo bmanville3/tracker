@@ -25,6 +25,7 @@ export const colors = {
   // States
   error: "#DC2626",
   revert: "#DC2626",
+  fadedRevert: "rgba(220, 38, 38, 0.1)",
   selection: "#4f46e5",
   fadedSelection: "rgba(79, 70, 229, 0.15)",
 };
