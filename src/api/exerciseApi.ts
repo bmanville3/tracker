@@ -4,7 +4,7 @@ import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import { ExerciseMuscleRow, ExerciseRow, UUID } from "../types";
 import { ExerciseAndMuscleTag, MuscleGroup } from "../types/enums";
-import { isSubsetOf, OmitNever } from "../utils";
+import { isSubsetOf, OmitNever, pageKey } from "../utils";
 
 // this data is rarely changed
 // no reason to refetch it all the time
@@ -16,7 +16,7 @@ const EXERCISE_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<ExerciseRow>(
   TTL_MS,
 );
 const EXERCISE_MUSCLE_CACHE =
-  CACHE_FACTORY.getOrCreateSwrIdCache<ExerciseMuscleRow>(
+  CACHE_FACTORY.getOrCreateSwrKeyedCache<Map<MuscleGroup, ExerciseMuscleRow>>(
     "exerciseMuscleCache",
     TTL_MS,
   );
@@ -67,42 +67,56 @@ export async function deleteExercise(id: UUID): Promise<void> {
   if (error) throw error;
 
   EXERCISE_CACHE.delete(id);
-  const idsToDelete = [...EXERCISE_MUSCLE_CACHE.getInnerMap().values()].filter(s => s.exercise_id === id).map(s => s.id);
-  idsToDelete.forEach(i => EXERCISE_MUSCLE_CACHE.delete(i))
+
+  const inner = EXERCISE_MUSCLE_CACHE.getInnerMap();
+
+  const updates = Array.from(inner.entries())
+    .map(([pageKeyQuery, cachedRows]) => {
+      const keysToDelete: MuscleGroup[] = [];
+      for (const [muscle_id, row] of cachedRows.entries()) {
+        if (row.exercise_id === id) keysToDelete.push(muscle_id);
+      }
+      if (keysToDelete.length === 0) return null;
+
+      const updatedCachedRows = new Map(cachedRows);
+      for (const muscle_id of keysToDelete) updatedCachedRows.delete(muscle_id);
+
+      return [pageKeyQuery, updatedCachedRows] as const;
+    })
+    .filter((x): x is readonly [string, Map<MuscleGroup, ExerciseMuscleRow>] => x !== null);
+
+  for (const [pageKeyQuery, updatedCachedRows] of updates) {
+    EXERCISE_MUSCLE_CACHE.set(pageKeyQuery, updatedCachedRows);
+  }
 }
 
-export async function fetchAllExerciseMuscleVolumes(): Promise<
-  Map<UUID, ExerciseMuscleRow>
-> {
-  return EXERCISE_MUSCLE_CACHE.fetch(async () => {
-    console.log("Fetching the exercise muscle table from the database...");
-    const { data, error } = await supabase.from("exercise_muscle").select("*");
-    if (error) throw error;
-    return data satisfies ExerciseMuscleRow[];
-  });
+function getPageKeyExerciseMuscle(exericse_id: UUID, user_id: UUID): string {
+  return pageKey('exMc', {exericse_id, user_id});
 }
 
 export async function fetchExerciseMuscleVolumes(
   exerciseId: UUID,
-  userId: UUID | null,
+  userId: UUID,
 ): Promise<Map<MuscleGroup, ExerciseMuscleRow>> {
-  const allRows = await fetchAllExerciseMuscleVolumes();
-  const forThisExercise = [...allRows.values()].filter(
-    (ex) => ex.exercise_id === exerciseId,
-  );
-  if (userId === null) {
-    return new Map(forThisExercise.map((row) => [row.muscle_id, row]));
-  }
-  const userEntries = forThisExercise.filter((row) => row.user_id === userId);
-  const musclesAlreadyEstablished = new Set(
-    userEntries.map((row) => row.muscle_id),
-  );
-  const systemEntries = forThisExercise.filter(
-    (row) =>
-      row.user_id === null && !musclesAlreadyEstablished.has(row.muscle_id),
-  );
-  const allEntries = [...userEntries, ...systemEntries];
-  return new Map(allEntries.map((row) => [row.muscle_id, row]));
+  const key = getPageKeyExerciseMuscle(exerciseId, userId);
+  return EXERCISE_MUSCLE_CACHE.fetch(key, async () => {
+    const { data, error } = await supabase.from('exercise_muscle')
+      .select('*')
+      .eq('exercise_id', exerciseId);
+    if (error) throw error;
+    const exerciseMuscleData = data satisfies ExerciseMuscleRow[];
+
+    const userEntries = exerciseMuscleData.filter((row) => row.user_id === userId);
+    const musclesAlreadyEstablished = new Set(
+      userEntries.map((row) => row.muscle_id),
+    );
+    const systemEntries = exerciseMuscleData.filter(
+      (row) =>
+        row.user_id === null && !musclesAlreadyEstablished.has(row.muscle_id),
+    );
+    const allEntries = [...userEntries, ...systemEntries];
+    return new Map(allEntries.map((row) => [row.muscle_id, row]));
+  });
 }
 
 export async function addExerciseMuscleVolume(args: {
@@ -112,10 +126,9 @@ export async function addExerciseMuscleVolume(args: {
   user_id: UUID;
 }): Promise<void> {
   if (args.volume_factor < 0 || args.volume_factor > 1) {
-    throw new Error(
-      `Volume should be between 0 and 1. Got ${args.volume_factor}`,
-    );
+    throw new Error(`Volume should be between 0 and 1. Got ${args.volume_factor}`);
   }
+
   const { data, error } = await supabase
     .from("exercise_muscle")
     .insert(args)
@@ -124,7 +137,12 @@ export async function addExerciseMuscleVolume(args: {
 
   if (error) throw error;
 
-  EXERCISE_MUSCLE_CACHE.upsert(data satisfies ExerciseMuscleRow);
+  const key = getPageKeyExerciseMuscle(args.exercise_id, args.user_id);
+
+  const existing = EXERCISE_MUSCLE_CACHE.peek(key);
+  const newMap = new Map(existing ?? []);
+  newMap.set(data.muscle_id, data);
+  EXERCISE_MUSCLE_CACHE.set(key, newMap);
 }
 
 export async function updateExerciseMuscleVolume(args: {
@@ -142,18 +160,69 @@ export async function updateExerciseMuscleVolume(args: {
 
   if (error) throw error;
 
-  EXERCISE_MUSCLE_CACHE.upsert(data satisfies ExerciseMuscleRow);
+  const inner = EXERCISE_MUSCLE_CACHE.getInnerMap();
+
+  const updates = Array.from(inner.entries())
+    .filter(([_k, cachedRows]) =>
+      Array.from(cachedRows.values()).some((row) => row.id === data.id)
+    )
+    .map(([pageKeyQuery, cachedRows]) => {
+      const updatedCachedRows = new Map(cachedRows);
+      for (const [muscle_id, row] of updatedCachedRows.entries()) {
+        if (row.id === data.id) updatedCachedRows.set(muscle_id, data);
+      }
+      return [pageKeyQuery, updatedCachedRows] as const;
+    });
+
+  for (const [pageKeyQuery, updatedCachedRows] of updates) {
+    EXERCISE_MUSCLE_CACHE.set(pageKeyQuery, updatedCachedRows);
+  }
 }
 
 export async function deleteExerciseMuscleVolume(id: UUID): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("exercise_muscle")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
 
   if (error) throw error;
+  if (data === null) return;
 
-  EXERCISE_MUSCLE_CACHE.delete(id);
+  // refetch the system row if it exists
+  const { data: systemRow, error: sysErr } = await supabase
+    .from("exercise_muscle")
+    .select("*")
+    .eq("exercise_id", data.exercise_id)
+    .eq("muscle_id", data.muscle_id)
+    .is("user_id", null)
+    .maybeSingle();
+  if (sysErr) throw sysErr;
+
+  const inner = EXERCISE_MUSCLE_CACHE.getInnerMap();
+
+  const updates = Array.from(inner.entries())
+    .map(([pageKeyQuery, cachedRows]) => {
+      let keyToEdit: MuscleGroup | null = null;
+      for (const [muscle_id, row] of cachedRows.entries()) {
+        if (row.id === data.id) { keyToEdit = muscle_id; break; }
+      }
+      if (keyToEdit === null) return null;
+
+      const updatedCachedRows = new Map(cachedRows);
+      if (systemRow !== null) {
+        updatedCachedRows.set(keyToEdit, systemRow);
+      } else {
+        updatedCachedRows.delete(keyToEdit);
+      }
+      return [pageKeyQuery, updatedCachedRows] as const;
+    })
+    .filter((x): x is readonly [string, Map<MuscleGroup, ExerciseMuscleRow>] => x !== null);
+
+  for (const [pageKeyQuery, updatedCachedRows] of updates) {
+    EXERCISE_MUSCLE_CACHE.set(pageKeyQuery, updatedCachedRows);
+  }
 }
 
 export async function searchExercises(

@@ -168,6 +168,7 @@ export default function WorkoutLogIndex() {
             const w = fw.workout;
 
             const preview = previewByWorkoutId[fw.logId] ?? "";
+            const totalSets = fw.sets.reduce((sum, s) => sum + s.length, 0);
 
             return (
               <Pressable
@@ -214,7 +215,7 @@ export default function WorkoutLogIndex() {
                   </View>
                 </View>
                 <Text style={typography.hint}>
-                  {fw.exercises.length} Exercise{fw.exercises.length === 1 ? '' : 's'}
+                  {fw.exercises.length} Exercise{fw.exercises.length === 1 ? '' : 's'} | {totalSets} Set{totalSets === 1 ? '' : 's'}
                 </Text>
 
                 {/* Preview of exercises */}

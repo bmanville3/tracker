@@ -22,6 +22,9 @@ export type ModalPickerProps<T> = {
   /** Title shown inside the modal (optional) */
   title?: string;
 
+  /** Help message shown inside the modal (optional) */
+  help?: string;
+
   options: ModalPickerOption<T>[];
 
   /** Currently selected value */
@@ -44,6 +47,7 @@ export type ModalPickerProps<T> = {
 
 export function ModalPicker<T>({
   title,
+  help,
   options,
   value,
   onChange,
@@ -86,8 +90,13 @@ export function ModalPicker<T>({
       <ClosableModal visible={visible} onRequestClose={() => setVisible(false)}>
         {/* Header */}
         {title && (
-          <Text style={[typography.title, { marginBottom: spacing.md }]}>
+          <Text style={[typography.title, { marginBottom: help ? spacing.xs : spacing.md }]}>
             {title}
+          </Text>
+        )}
+        {help && (
+          <Text style={[typography.hint, { marginBottom: spacing.md }]}>
+            {help}
           </Text>
         )}
 
