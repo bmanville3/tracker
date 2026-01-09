@@ -752,7 +752,6 @@ export function WorkoutView<M extends WorkoutEditorMode>(
         >
           <Feather name="more-horizontal" size={18} color="black" />
         </Pressable>
-        {renderAdvancedSet()}
       </View>
     );
   };
@@ -1175,7 +1174,6 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             );
           })
         )}
-      {renderAdvancedExercise()}
       </View>
     );
   };
@@ -1323,6 +1321,8 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           <Button title="Exit" onPress={requestClose} variant={allowEditing ? "secondary" : "primary"} />
         </View>
       </View>
+      {renderAdvancedSet()}
+      {renderAdvancedExercise()}
     </Screen>
   );
 }
