@@ -136,8 +136,7 @@ export default function WorkoutLogIndex() {
         <View>
           <Text style={styles.headerTitle}>Workout Log</Text>
           <Text style={styles.headerSubtitle}>
-            Review and manage your recent training sessions.
-            {"\n"}
+            Review and manage your recent training{"\n"}sessions.
             Click on a workout to view it.
           </Text>
         </View>
@@ -182,11 +181,7 @@ export default function WorkoutLogIndex() {
                     <Text style={typography.hint}>
                       {w.completed_on ?? "Uncompleted workout"}
                     </Text>
-                    {w.name ? (
-                      <Text style={typography.subsection}>{w.name}</Text>
-                    ) : (
-                      <Text style={typography.subsection}>Untitled Workout</Text>
-                    )}
+                    <Text style={{...typography.subsection, color: colors.navy}}>{w.name ? w.name : "Untitled Workout"}</Text>
                   </View>
 
                   <View style={styles.iconRow}>
@@ -307,6 +302,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...typography.title,
+    color: colors.orange
   },
   headerSubtitle: {
     ...typography.hint,

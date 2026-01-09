@@ -22,6 +22,10 @@ export const colors = {
   textOnPrimary: "#FFFFFF",
   placeholderTextColor: "#9aa0a6",
 
+  orange: "#c98459",
+  teal: "#09aab0",
+  navy: "#223d83ff",
+
   // States
   error: "#DC2626",
   revert: "#DC2626",

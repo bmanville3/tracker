@@ -8,6 +8,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  ScrollViewProps,
   StyleProp,
   StyleSheet,
   View,
@@ -17,13 +18,16 @@ import {
 export type ClosableModalProps = ModalProps & {
   children: React.ReactNode;
   sheetStyle?: StyleProp<ViewStyle>;
+  scrollViewProps?: ScrollViewProps;
 };
 
 export function ClosableModal({
   children,
   sheetStyle,
+  scrollViewProps,
   ...modalProps
 }: ClosableModalProps) {
+  const { style: scrollViewStyle, contentContainerStyle, ...rest } = scrollViewProps ?? {};
   return (
     <Modal transparent animationType="fade" {...modalProps}>
       <KeyboardAvoidingView
@@ -40,9 +44,11 @@ export function ClosableModal({
         <View style={styles.modalWrap} pointerEvents="box-none">
           <View style={[styles.modalCard, sheetStyle]}>
             <ScrollView
-              contentContainerStyle={{ paddingBottom: spacing.lg }}
+              contentContainerStyle={[{ paddingBottom: spacing.lg }, contentContainerStyle]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              style={scrollViewStyle}
+              {...rest}
             >
               {children}
             </ScrollView>

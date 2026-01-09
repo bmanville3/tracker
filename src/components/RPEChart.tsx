@@ -26,12 +26,12 @@ export const RPE_TABLE: Record<RPE, Record<RpeTableReps, number>> = {
   6:   {1:0.863, 2:0.837, 3:0.811, 4:0.786, 5:0.762, 6:0.739, 7:0.707, 8:0.680, 9:0.653, 10:0.626, 11:0.599, 12:0.574},
 };
 
-function isWithinRange(reps: number): boolean {
+export function isWithinRPERepRange(reps: number): boolean {
   return reps >= 1 && reps <= MAX_ALLOWED_REPS;
 }
 
-export function rpeChartPercentageOfMax(reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function rpeChartPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   const table = RPE_TABLE[rpe ?? 10];
@@ -55,53 +55,53 @@ export function rpeChartPercentageOfMax(reps: number, rpe?: RPE): number | null 
   return lowerVal * (1 - frac) + upperVal * frac;
 }
 
-export function rpeChartE1RM(weight: number, reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function rpeChartE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   const percent = rpeChartPercentageOfMax(reps, rpe);
   return percent === null ? null : weight / percent;
 }
 
-export function epleyPercentageOfMax(reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function epleyPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   return 1 / (1 + (reps + (10 - (rpe ?? 10))) / 30);
 }
 
-export function epleyE1RM(weight: number, reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function epleyE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   const percent = epleyPercentageOfMax(reps, rpe);
   return percent === null ? null : weight / percent;
 }
 
-export function brzyckiPercentageOfMax(reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function brzyckiPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   return (37 - (reps + (10 - (rpe ?? 10)))) / 36;
 }
 
-export function brzyckiE1RM(weight: number, reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function brzyckiE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   const percent = brzyckiPercentageOfMax(reps, rpe);
   return percent === null ? null : weight / percent;
 }
 
-export function landerPercentageOfMax(reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function landerPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   return (101.3 - 2.67123 * (reps + (10 - (rpe ?? 10)))) / 100
 }
 
-export function landerE1RM(weight: number, reps: number, rpe?: RPE): number | null {
-  if (!isWithinRange(reps)) {
+export function landerE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+  if (!isWithinRPERepRange(reps)) {
     return null;
   }
   const percent = landerPercentageOfMax(reps, rpe);
@@ -110,7 +110,7 @@ export function landerE1RM(weight: number, reps: number, rpe?: RPE): number | nu
 
 
 type TableProps = {
-  getPercent: (reps: number, rpe?: RPE) => number | null;
+  getPercent: (reps: number, rpe?: RPE | null) => number | null;
 };
 
 function Table({ getPercent }: TableProps) {
@@ -196,7 +196,7 @@ export const RPE_TABLE_MODE_DESCRIPTIONS: Record<RpeTableMode, string> = {
     "A historically used but less popular linear model. Mathematically very similar in spirit to Epley: 1RM ≈ weight \u00D7 100 / (101.3 - 2.67123 \u00D7 reps). Useful primarily for comparison or academic curiosity, but rarely preferred as a main training tool today compared to Tuchscherer or Epley.",
 };
 
-export const RPE_TABLE_MODE_TO_PERCENT_FUNCTION: Record<RpeTableMode, (reps: number, rpe?: RPE) => number | null> = {
+export const RPE_TABLE_MODE_TO_PERCENT_FUNCTION: Record<RpeTableMode, (reps: number, rpe?: RPE | null) => number | null> = {
   "Tuchscherer's Chart": rpeChartPercentageOfMax,
   "Epley Formula (1985)": epleyPercentageOfMax,
   "Brzycki Formula (1993)": brzyckiPercentageOfMax,
@@ -204,7 +204,7 @@ export const RPE_TABLE_MODE_TO_PERCENT_FUNCTION: Record<RpeTableMode, (reps: num
 }
 export const RPE_TABLE_MODE_TO_E1RM_FUNCTION: Record<
   RpeTableMode,
-  (weight: number, reps: number, rpe?: RPE) => number | null
+  (weight: number, reps: number, rpe?: RPE | null) => number | null
 > = {
   "Tuchscherer's Chart": rpeChartE1RM,
   "Epley Formula (1985)": epleyE1RM,
@@ -265,7 +265,7 @@ export function RpeTable({
     ...dataset.filter(d => d.key === mode),
   ];
 
-  const mapToPoints = (fn: (reps: number, rpe?: RPE) => number | null) =>
+  const mapToPoints = (fn: (reps: number, rpe?: RPE | null) => number | null) =>
     RPE_TABLE_REPS.map((reps) => {
       const p = fn(reps, 10) ?? 0;
       return { value: p * 100 };
@@ -427,7 +427,7 @@ export function RpeTable({
             </View>
           </View>
 
-          {calcReps !== null && !isWithinRange(calcReps) && <Text style={{...typography.hint, marginTop: 4}}>
+          {calcReps !== null && !isWithinRPERepRange(calcReps) && <Text style={{...typography.hint, marginTop: 4}}>
             Reps must be between 1 and {MAX_ALLOWED_REPS} (inclusive)
           </Text>}
 
@@ -444,7 +444,7 @@ export function RpeTable({
                   paddingVertical: 10,
                   paddingHorizontal: 16,
                   borderRadius: 10,
-                  backgroundColor: colors.fadedPrimary ?? colors.surfaceAlt,
+                  backgroundColor: colors.fadedPrimary,
                   marginBottom: spacing.xs,
                 }}
               >
@@ -549,7 +549,7 @@ export function RpeTable({
             set (weight, reps, RPE) you entered in the calculator.
           </Text>
 
-          {e1rm !== null && calcWeight !== null && calcReps !== null && calcRpe !== null && isWithinRange(calcReps) ? (
+          {e1rm !== null && calcWeight !== null && calcReps !== null && calcRpe !== null && isWithinRPERepRange(calcReps) ? (
             <>
               {/* Build chart data from the current calculator inputs */}
               <BarChart

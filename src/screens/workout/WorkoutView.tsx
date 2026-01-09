@@ -1,9 +1,9 @@
-import { getExerciseWithState } from "@/src/api/exerciseApi";
 import { upsertWorkoutLog } from "@/src/api/workoutLogApi";
 import {
   AnyEditableSet,
   EditableExercise,
   editableExerciseEqual,
+  EditablePerformanceType,
   EditableSet,
   editableSetEqual,
   EditableWorkout,
@@ -11,6 +11,7 @@ import {
   FullDetachedWorkoutForMode,
   isFullLogWorkout,
   isFullTemplateWorkout,
+  isLogSet,
   isLogWorkout,
   isTemplateSet,
   isTemplateWorkout,
@@ -20,6 +21,7 @@ import {
 import { upsertTemplateWorkout } from "@/src/api/workoutTemplateApi";
 import {
   Button,
+  ClosableModal,
   ModalPicker,
   NumberField,
   Screen,
@@ -27,19 +29,19 @@ import {
   TextField,
 } from "@/src/components/";
 import { CalendarModal } from "@/src/components/CalendarModal";
-import { colors, typography } from "@/src/theme";
+import { isWithinRPERepRange, rpeChartE1RM } from "@/src/components/RPEChart";
+import { colors, spacing, typography } from "@/src/theme";
 import {
   DISTANCE_UNITS,
   DistanceUnit,
   ExerciseRow,
-  PERFORMANCE_TYPES,
-  RPES,
   SET_TYPES,
   UUID,
   WEIGHT_UNITS,
   WeightUnit
 } from "@/src/types";
 import {
+  anyErrorToString,
   arraysEqual,
   capitalizeFirstLetter,
   changeWeightUnit,
@@ -47,6 +49,7 @@ import {
   requireGetUser,
   showAlert,
 } from "@/src/utils";
+import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { ExerciseModal } from "../ExerciseModal";
@@ -60,6 +63,16 @@ export interface WorkoutEditorModeStrategy<M extends WorkoutEditorMode> {
     weightUnit: WeightUnit;
     distanceUnit: DistanceUnit;
   }): EditableSet<M>;
+
+  renderSetBody(ctx: {
+    set: EditableSet<'log'>,
+    setIndex: number,
+    handleUpdateSetCurried: <K extends keyof EditableSet<WorkoutEditorMode>> (key: K, value: EditableSet<WorkoutEditorMode>[K]) => void,
+    isLoading: boolean,
+    allowEditing: boolean
+  }): React.JSX.Element;
+
+  getPerformanceTypes(): {label: string, value: EditablePerformanceType<M>}[];
 }
 
 function computeInitialState<M extends WorkoutEditorMode>(
@@ -131,6 +144,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
 
   const [openDatePicker, setOpenDatePicker] = useState<boolean>(false);
 
+  const [advancedExercise, setAdvancedExercise] = useState<number | null>(null);
+  const [advancedSet, setAdvancedSet] = useState<[number, number] | null>(null);
+
   const initialWorkoutRef = useRef<EditableWorkout<M> | null>(null);
   const initialExercisesRef = useRef<EditableExercise<M>[] | null>(null);
   const initialSetsRef = useRef<EditableSet<M>[][] | null>(null);
@@ -146,6 +162,8 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       setOpenExercisePicker(false);
       setExercisePickerFunction(null);
       setOpenDatePicker(false);
+      setAdvancedSet(null);
+      setAdvancedExercise(null);
 
       const initial = computeInitialState(strategy, loadWithExisting);
 
@@ -211,84 +229,84 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     return (
       <View style={{ marginBottom: 16 }}>
         {/* Name row */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 8,
+        <TextField
+          value={workout.name}
+          onChangeText={(text) => {
+            const newWorkout: EditableWorkout<M> = {...workout};
+            newWorkout.name = text;
+            setWorkout(newWorkout);
           }}
-        >
-          <TextField
-            value={workout.name}
-            onChangeText={(text) => {
-              const newWorkout: EditableWorkout<M> = {...workout};
-              newWorkout.name = text;
-              setWorkout(newWorkout);
-            }}
-            placeholder="Untitled workout"
-            placeholderTextColor={colors.placeholderTextColor}
-            style={{
-              ...typography.title,
-              flex: 1,
-              paddingVertical: 1,
-            }}
-            editable={!isLoading && allowEditing}
-          />
-        </View>
+          placeholder="Untitled workout"
+          placeholderTextColor={colors.placeholderTextColor}
+          style={{
+            ...typography.title,
+            paddingVertical: spacing.padding_sm,
+            color: colors.navy,
+            marginBottom: spacing.md,
+            flex: 1,
+          }}
+          editable={!isLoading && allowEditing}
+        />
         {!allowEditing && (
-          <Text style={{ ...typography.subsection, marginBottom: 10 }}>
-            Editing disabled
+          <Text style={{
+            ...typography.subsection,
+            marginBottom: spacing.md,
+            color: colors.navy,
+          }}>
+            (View Only)
           </Text>
         )}
         {isLogWorkout(workout) && (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              flexWrap: "wrap",
-              rowGap: 8,
-            }}
-          >
-            <Text>Completed On:</Text>
-            <Pressable
-              onPress={() => setOpenDatePicker((prev) => !prev)}
-              style={{
-                ...typography.hint,
-                borderRadius: 999,
-                borderColor: colors.border,
-                borderWidth: 1,
-                backgroundColor: colors.surface,
-                marginLeft: 4,
-              }}
-              disabled={!allowEditing}
-            >
-              <Text style={{ ...typography.hint, padding: 4 }}>
-                {workout.completed_on}
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* Meta row: duration + bodyweight + units */}
-        {isLogWorkout(workout) && (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              flexWrap: "wrap",
-              rowGap: 8,
-            }}
-          >
-            {/* Duration */}
+          <View>
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                marginRight: 16,
+                flexWrap: "wrap",
+                gap: spacing.xs,
               }}
             >
-              <Text style={[typography.label, { marginRight: 4 }]}>
-                Duration (min)
+              <Text style={typography.body}>Completed On:</Text>
+              <Pressable
+                onPress={() => setOpenDatePicker((prev) => !prev)}
+                style={styles.pressable}
+                disabled={!allowEditing}
+              >
+                <Text style={typography.hint}>
+                  {workout.completed_on}
+                </Text>
+              </Pressable>
+              <Text style={{...typography.body, marginLeft: spacing.md }}>Units:</Text>
+              <ModalPicker
+                title="Default Weight Unit for Workout"
+                options={WEIGHT_UNITS.map((u) => {return {label: u, value: u}})}
+                value={weightUnit}
+                onChange={(u) => setWeightUnit(u)}
+                pressableProps={{ style: styles.pressable}}
+                textProps={{ style: typography.hint }}
+                disabled={!allowEditing || isLoading}
+              />
+              <ModalPicker
+                title="Default Distance Unit for Workout"
+                options={DISTANCE_UNITS.map((u) => {return {label: u, value: u}})}
+                value={distanceUnit}
+                onChange={(u) => setDistanceUnit(u)}
+                pressableProps={{ style: styles.pressable }}
+                textProps={{ style: typography.hint }}
+                disabled={!allowEditing || isLoading}
+              />
+            </View>
+            {/* Meta row: duration + bodyweight + units */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                flexWrap: "wrap",
+                marginTop: spacing.sm,
+              }}
+            >
+              <Text style={[typography.body]}>
+                Duration (min):
               </Text>
               <NumberField
                 numberValue={
@@ -306,27 +324,17 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 placeholder="min"
                 placeholderTextColor={colors.placeholderTextColor}
                 style={{
-                  ...typography.body,
                   padding: 0,
                   width: 65,
                   borderBottomWidth: 1,
                   borderColor: colors.border,
                   textAlign: "center",
+                  marginLeft: spacing.sm,
                 }}
                 editable={!isLoading && allowEditing}
               />
-            </View>
-
-            {/* Bodyweight */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginRight: 16,
-              }}
-            >
-              <Text style={[typography.label, { marginRight: 4 }]}>
-                Bodyweight ({weightUnit})
+              <Text style={{...typography.body, marginLeft: spacing.md}}>
+                Bodyweight ({weightUnit}):
               </Text>
               <NumberField
                 numberValue={
@@ -346,7 +354,6 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 placeholder={weightUnit}
                 placeholderTextColor={colors.placeholderTextColor}
                 style={{
-                  ...typography.body,
                   padding: 0,
                   width: 65,
                   borderBottomWidth: 1,
@@ -359,43 +366,6 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             </View>
           </View>
         )}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 4,
-            marginTop: 4,
-          }}
-        >
-          {WEIGHT_UNITS.map((u) => {
-            const selected = u === weightUnit;
-            return (
-              <Selection
-                key={u}
-                title={u}
-                isSelected={selected}
-                onPress={() => setWeightUnit(u)}
-                disabled={isLoading || !allowEditing}
-              />
-            );
-          })}
-          <Text style={[typography.label, { marginRight: 8, marginLeft: 8 }]}>
-            |
-          </Text>
-          {DISTANCE_UNITS.map((u) => {
-            const selected = u === distanceUnit;
-            return (
-              <Selection
-                key={u}
-                title={u}
-                isSelected={selected}
-                onPress={() => setDistanceUnit(u)}
-                disabled={isLoading || !allowEditing}
-              />
-            );
-          })}
-        </View>
       </View>
     );
   };
@@ -448,6 +418,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       );
       return newSets;
     });
+    if (advancedSet !== null && advancedSet[1] === setIndex) {
+      setAdvancedSet(null);
+    }
   };
 
   const handleSwapSetsInExercise = (
@@ -475,6 +448,13 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       ];
       return newSets;
     });
+    if (advancedSet !== null) {
+      if (advancedSet[1] === s1) {
+        setAdvancedSet([advancedSet[0], s2]);
+      } else if (advancedSet[1] === s2) {
+        setAdvancedSet([advancedSet[0], s1]);
+      }
+    }
   };
 
   const handleRemoveExercise = (index: number) => {
@@ -483,6 +463,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     }
     setExercises((prev) => prev.filter((_, i) => i !== index));
     setSets((prev) => prev.filter((_, i) => i !== index));
+    if (advancedExercise === index) {
+      setAdvancedExercise(null);
+    }
+    if (advancedSet !== null && advancedSet[0] === index) {
+      setAdvancedSet(null);
+    }
   };
 
   const handleUpdateExercise = <
@@ -525,6 +511,208 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     });
   };
 
+  const renderAdvancedSet = () => {
+    if (advancedSet === null) {
+      return null;
+    }
+    const [exerciseIndex, setIndex] = advancedSet;
+    const set = sets[exerciseIndex][setIndex];
+    const e1rm = isLogSet(set) && set.reps && set.weight && isWithinRPERepRange(set.reps) ? rpeChartE1RM(set.weight, set.reps, set.rpe) : null;
+    return <ClosableModal
+      visible={advancedSet !== null && advancedSet[0] === exerciseIndex && advancedSet[1] === setIndex}
+      onRequestClose={() => setAdvancedSet(null)}
+      scrollViewProps={{ contentContainerStyle: {gap: spacing.md} }}
+    >
+      <Text
+        style={{
+          ...typography.section,
+          borderBottomWidth: 2,
+          borderBottomColor: colors.border,
+          marginBottom: spacing.sm,
+          paddingBottom: spacing.padding_sm,
+        }}
+      >
+        Advanced Logging for {exercises[exerciseIndex].exercise.name} - Exercise {exerciseIndex + 1} - Set {setIndex + 1}
+      </Text>
+      <Text style={{
+          ...typography.subsection,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          marginBottom: spacing.sm,
+          paddingBottom: spacing.padding_sm,
+        }}
+      >
+        Options
+      </Text>
+      {allowEditing && sets[exerciseIndex].length > 1 && <View style={{ flexDirection: "row", alignItems: 'center', gap: 1 }}>
+        <Text style={{...typography.body, marginRight: spacing.md}}>Move Set:</Text>
+        {setIndex !== 0 && (
+          <Button
+            title="&uarr;"
+            onPress={() =>
+              handleSwapSetsInExercise(
+                exerciseIndex,
+                setIndex,
+                setIndex - 1,
+              )
+            }
+            variant="secondary"
+            style={{ padding: 5 }}
+            textProps={{ style: { fontSize: 12 } }}
+            disabled={isLoading || !allowEditing}
+          />
+        )}
+        {setIndex !== sets[exerciseIndex].length - 1 && (
+          <Button
+            title="&darr;"
+            onPress={() =>
+              handleSwapSetsInExercise(
+                exerciseIndex,
+                setIndex,
+                setIndex + 1,
+              )
+            }
+            variant="secondary"
+            style={{ padding: 5 }}
+            textProps={{ style: { fontSize: 12 } }}
+            disabled={isLoading || !allowEditing}
+          />
+        )}
+      </View>}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{...typography.body, marginRight: spacing.md}}>Set Type:</Text>
+        <ModalPicker
+          title="Pick Set Type"
+          options={SET_TYPES.map((t) => {
+            return {
+              label: t !== null ? capitalizeFirstLetter(t) : "None",
+              value: t,
+            };
+          })}
+          value={set.set_type}
+          onChange={(v) => handleUpdateSet(exerciseIndex, setIndex, "set_type", v)}
+          textProps={{ style: typography.body }}
+          disabled={isLoading || !allowEditing}
+        />
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{...typography.body, marginRight: spacing.md}}>Performance Type:</Text>
+        <ModalPicker
+          title="Pick Performance Metrics for Set"
+          options={strategy.getPerformanceTypes()}
+          value={set.performance_type}
+          onChange={(v) => handleUpdateSet(exerciseIndex, setIndex, "performance_type", v)}
+          textProps={{ style: typography.body }}
+          disabled={isLoading || !allowEditing}
+        />
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ ...typography.body, marginRight: spacing.md }}>
+          Rest Before Set (sec):
+        </Text>
+        <NumberField
+          numberValue={set.rest_seconds_before}
+          placeholder="sec"
+          onChangeNumber={(value) =>
+            handleUpdateSet(exerciseIndex, setIndex, "rest_seconds_before", value)
+          }
+          numberType="int"
+          style={{ ...typography.body, padding: spacing.padding_lg, width: 65 }}
+          editable={!isLoading && allowEditing}
+        />
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ ...typography.body, marginRight: spacing.md }}>
+          Set Duration (sec):
+        </Text>
+        <NumberField
+          numberValue={set.duration_seconds}
+          placeholder="sec"
+          onChangeNumber={(value) =>
+            handleUpdateSet(exerciseIndex, setIndex, "duration_seconds", value)
+          }
+          numberType="int"
+          style={{ ...typography.body, padding: spacing.padding_lg, width: 65 }}
+          editable={!isLoading && allowEditing}
+        />
+      </View>
+      <Text style={{
+          ...typography.subsection,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          marginBottom: spacing.sm,
+          paddingBottom: spacing.padding_sm,
+        }}
+      >
+        Metrics
+      </Text>
+      {e1rm !== null ?
+        <View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+            }}
+          >
+            <Text style={{...typography.body, marginRight: spacing.md}}>
+              Estimated One Rep Max (e1RM):
+            </Text>
+            <View
+              style={{
+                borderRadius: 10,
+                padding: spacing.padding_sm,
+                backgroundColor: colors.fadedPrimary,
+              }}
+            >
+              <Text
+                style={{
+                  ...typography.body,
+                  fontWeight: "700",
+                }}
+              >
+                {e1rm.toFixed(1)} {set.weight_unit}{e1rm === 1 ? '' : 's'}
+              </Text>
+            </View>
+          </View>
+          {!set.rpe && <Text style={typography.hint}>Used RPE 10 (max effort set).{"\n"}Add an RPE for a more precise estimation.</Text>}
+        </View> :
+        isLogSet(set) && <Text style={typography.body}>Add weight and reps (1-12) to see your Estimated One Rep Max (e1RM).</Text>
+      }
+      <Button
+        title="Close"
+        onPress={() => setAdvancedSet(null)}
+      />
+      {allowEditing && <Button
+        title="Delete Set"
+        onPress={() => {
+          handleRemoveSetInExercise(exerciseIndex, setIndex);
+        }}
+        variant="revert"
+        disabled={!allowEditing || isLoading}
+      />}
+    </ClosableModal>
+  }
+
   const renderSet = (
     exerciseIndex: number,
     set: AnyEditableSet,
@@ -535,261 +723,6 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     >(key: K, value: EditableSet<WorkoutEditorMode>[K]) {
       handleUpdateSet(exerciseIndex, setIndex, key, value);
     }
-
-    const rpeFieldRender = () => {
-      return (
-        <ModalPicker
-          options={[...RPES.map(r => {return {label: r.toString(), value: r}}), {label: 'RPE', value: null}]}
-          onChange={(value) => handleUpdateSetCurried("rpe", value)}
-          pressableProps={{  style: { padding: 4 } }}
-          disabled={isLoading || !allowEditing}
-          value={set.rpe}
-        />
-      );
-    };
-
-    const repsFieldRender = () => {
-      return (
-        <NumberField
-          numberValue={set.reps}
-          placeholder="Reps"
-          onChangeNumber={(value) => {
-            if (value !== null && value < 0) {
-              return;
-            }
-            handleUpdateSetCurried("reps", value);
-          }}
-          numberType="float"
-          editable={!isLoading && allowEditing}
-          style={{ padding: 4 }}
-        />
-      );
-    };
-
-    const renderSetHeader = () => {
-      return (
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 4,
-            alignItems: "center",
-            marginBottom: 4,
-          }}
-        >
-          <Text style={typography.hint}>Set Type: </Text>
-          <ModalPicker
-            title="Pick Set Type"
-            options={SET_TYPES.map((t) => {
-              return {
-                label: t !== null ? capitalizeFirstLetter(t) : "None",
-                value: t,
-              };
-            })}
-            value={set.set_type}
-            onChange={(v) => handleUpdateSetCurried("set_type", v)}
-            textProps={{ style: typography.hint }}
-            disabled={isLoading || !allowEditing}
-          />
-          {isTemplateSet(set) && (
-            <ModalPicker
-              title="Pick Performance Metrics for Set"
-              options={PERFORMANCE_TYPES.filter(
-                (t) => t === "rpe" || t === "percentage",
-              ).map((t) => {
-                return {
-                  label: t === "rpe" ? "RPE" : capitalizeFirstLetter(t),
-                  value: t,
-                };
-              })}
-              value={set.performance_type}
-              onChange={(v) => handleUpdateSetCurried("performance_type", v)}
-              textProps={{ style: typography.hint }}
-              disabled={isLoading || !allowEditing}
-            />
-          )}
-          <View style={{ marginLeft: "auto", flexDirection: "row", gap: 0 }}>
-            {setIndex !== 0 && (
-              <Button
-                title="&uarr;"
-                onPress={() =>
-                  handleSwapSetsInExercise(
-                    exerciseIndex,
-                    setIndex,
-                    setIndex - 1,
-                  )
-                }
-                variant="secondary"
-                style={{ padding: 5 }}
-                textProps={{ style: { fontSize: 12 } }}
-                disabled={isLoading || !allowEditing}
-              />
-            )}
-            {setIndex !== sets[exerciseIndex].length - 1 && (
-              <Button
-                title="&darr;"
-                onPress={() =>
-                  handleSwapSetsInExercise(
-                    exerciseIndex,
-                    setIndex,
-                    setIndex + 1,
-                  )
-                }
-                variant="secondary"
-                style={{ padding: 5 }}
-                textProps={{ style: { fontSize: 12 } }}
-                disabled={isLoading || !allowEditing}
-              />
-            )}
-            <Button
-              title="&times;"
-              onPress={() => handleRemoveSetInExercise(exerciseIndex, setIndex)}
-              variant="revert"
-              style={{ padding: 5 }}
-              textProps={{ style: { fontSize: 12 } }}
-              disabled={isLoading || !allowEditing}
-            />
-          </View>
-        </View>
-      );
-    };
-
-    const renderTemplateRPEDisplay = () => {
-      if (!isTemplateSet(set) || set.performance_type !== "rpe") {
-        showAlert("Failed to render set. Please check the logs");
-        console.error(`Failed to render as template rpe set: ${set}`);
-        return null;
-      }
-      return (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
-          <View style={{ width: 60, marginRight: 6 }}>{repsFieldRender()}</View>
-          <Text style={{ ...typography.body, marginRight: 4 }}>Reps @ RPE</Text>
-          <View style={{ width: 60, marginLeft: 6, marginRight: 6 }}>
-            {rpeFieldRender()}
-          </View>
-        </View>
-      );
-    };
-
-    const renderTemplatePercentageDisplay = () => {
-      if (!isTemplateSet(set) || set.performance_type !== "percentage") {
-        showAlert("Failed to render set. Please check the logs");
-        console.error(`Failed to render as template percentage set: ${set}`);
-        return null;
-      }
-      return (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
-          <View style={{ width: 60, marginRight: 6 }}>
-            <NumberField
-              numberValue={set.percentage_of_max}
-              placeholder="%"
-              onChangeNumber={(value) =>
-                handleUpdateSetCurried("percentage_of_max", value)
-              }
-              numberType="float"
-              editable={!isLoading && allowEditing}
-              style={{ padding: 4 }}
-            />
-          </View>
-          <Text style={{ ...typography.body, marginRight: 6 }}>
-            % of 1RM of
-          </Text>
-          <View style={{ flexDirection: "row", gap: 4 }}>
-            <Pressable
-              onPress={() => {
-                setOpenExercisePicker(true);
-                setExercisePickerFunction(() => (exerciseRow: ExerciseRow) => {
-                  handleUpdateSetCurried(
-                    "max_percentage_exercise_id",
-                    exerciseRow.id,
-                  );
-                });
-              }}
-              style={{
-                ...typography.hint,
-                borderRadius: 999,
-                borderColor: colors.border,
-                backgroundColor: colors.surface,
-                padding: 4,
-              }}
-              disabled={!allowEditing}
-            >
-              <Text style={{ ...typography.hint, padding: 4 }}>
-                {set.max_percentage_exercise_id
-                  ? (getExerciseWithState(set.max_percentage_exercise_id)
-                      ?.name ?? "Not Found")
-                  : exercises[exerciseIndex].exercise.name}
-              </Text>
-            </Pressable>
-          </View>
-
-          <Text style={{ ...typography.body, marginRight: 6, marginLeft: 6 }}>
-            &times;
-          </Text>
-          <View style={{ width: 60, marginRight: 6 }}>{repsFieldRender()}</View>
-          <Text style={{ ...typography.body, marginRight: 6 }}>Reps</Text>
-        </View>
-      );
-    };
-
-    const renderLogDisplay = () => {
-      return (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginTop: 4,
-          }}
-        >
-          <View style={{ width: 70, marginRight: 6 }}>
-            <NumberField
-              numberValue={set.weight}
-              placeholder="Weight"
-              onChangeNumber={(value) =>
-                handleUpdateSetCurried("weight", value)
-              }
-              numberType={"float"}
-              editable={!isLoading && allowEditing}
-              style={{ padding: 4 }}
-            />
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: colors.border,
-              marginRight: 6,
-            }}
-          >
-            {WEIGHT_UNITS.map((u) => {
-              return (
-                <Selection
-                  key={`${u}-${exerciseIndex}-${setIndex}`}
-                  title={u}
-                  isSelected={u === set.weight_unit}
-                  onPress={() => handleUpdateSetCurried("weight_unit", u)}
-                  disabled={isLoading || !allowEditing}
-                />
-              );
-            })}
-          </View>
-          <Text style={{ ...typography.body, marginRight: 4 }}>&times;</Text>
-          <View style={{ width: 60, marginRight: 6 }}>{repsFieldRender()}</View>
-          <Text style={{ ...typography.body, marginRight: 4 }}>Reps @ RPE</Text>
-          <View style={{ width: 60, marginLeft: 6 }}>{rpeFieldRender()}</View>
-        </View>
-      );
-    };
 
     return (
       <View
@@ -802,65 +735,24 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           borderColor: colors.border,
           marginBottom: 6,
           backgroundColor: colors.surfaceAlt,
+          flexDirection: 'row',
+          alignItems: 'center',
         }}
       >
-        {/* Top row: Set label, classification chips, complete toggle */}
-        {renderSetHeader()}
-
-        {/* Middle row*/}
         <View>
           {isTemplateSet(set)
-            ? set.performance_type === "rpe"
-              ? renderTemplateRPEDisplay()
-              : set.performance_type === "percentage"
-                ? renderTemplatePercentageDisplay()
-                : (() => {
-                    throw new Error(
-                      `Unknown performance type: ${set.performance_type}`,
-                    );
-                  })()
-            : renderLogDisplay()}
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 5,
-            }}
-          >
-            <Text style={{ ...typography.hint, marginRight: 6 }}>
-              Rest Before (s)
-            </Text>
-            <View style={{ width: 50 }}>
-              <NumberField
-                numberValue={set.rest_seconds_before}
-                placeholder="sec"
-                onChangeNumber={(value) =>
-                  handleUpdateSetCurried("rest_seconds_before", value)
-                }
-                numberType="int"
-                style={{ fontSize: 13, padding: 4 }}
-                editable={!isLoading && allowEditing}
-              />
-            </View>
-
-            <Text style={{ ...typography.hint, marginRight: 6, marginLeft: 6 }}>
-              Dur (s)
-            </Text>
-            <View style={{ width: 50 }}>
-              <NumberField
-                numberValue={set.duration_seconds}
-                placeholder="sec"
-                onChangeNumber={(value) =>
-                  handleUpdateSetCurried("duration_seconds", value)
-                }
-                numberType="int"
-                style={{ fontSize: 13, padding: 4 }}
-                editable={!isLoading && allowEditing}
-              />
-            </View>
-          </View>
+            ? <Text>Template sets are not supported yet</Text>
+            : isLogSet(set)  ? strategy.renderSetBody({set, setIndex, handleUpdateSetCurried, isLoading, allowEditing})
+            : <Text>Unknown set type. Cannot render</Text>}
         </View>
+        {/* Top row: Set label, classification chips, complete toggle */}
+        <Pressable
+          onPress={() => setAdvancedSet([exerciseIndex, setIndex])}
+          style={{ marginLeft: 'auto' }}
+        >
+          <Feather name="more-horizontal" size={18} color="black" />
+        </Pressable>
+        {renderAdvancedSet()}
       </View>
     );
   };
@@ -910,7 +802,207 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       [next[i1], next[i2]] = [next[i2], next[i1]];
       return next;
     });
+    if (advancedExercise === i1) {
+      setAdvancedExercise(i2)
+    } else if (advancedExercise === i2) {
+      setAdvancedExercise(i1)
+    }
+    if (advancedSet !== null && advancedSet[0] === i1) {
+      setAdvancedSet([i2, advancedSet[1]]);
+    } else if (advancedSet !== null && advancedSet[0] === i2) {
+      setAdvancedSet([i1, advancedSet[1]]);
+    }
   };
+
+  const renderAdvancedExercise = () => {
+    if (advancedExercise === null) {
+      return null;
+    }
+    const exerciseIdx = advancedExercise;
+    const setsForExercise = sets[exerciseIdx];
+    const exercise = exercises[exerciseIdx];
+    let bestSetByE1RM: [EditableSet<'log'>, number] | null = null;
+    if (isLogWorkout(workout) && setsForExercise.length > 0) {
+      const logSets = setsForExercise.filter(
+      (s): s is EditableSet<'log'> => 
+        isLogSet(s) && s.weight !== null && s.reps !== null
+    );
+      const withE1RM = logSets.map(set => {
+        const weightInTargetUnit = changeWeightUnit(
+          set.weight!,
+          set.weight_unit,
+          'kg'
+        );
+
+        const e1rm = rpeChartE1RM(
+          weightInTargetUnit,
+          set.reps!,
+          set.rpe
+        );
+
+        return [set, e1rm] as const;
+      }).filter(([_s, e1rm]) => e1rm !== null);
+
+      const bestSetByE1RMMaybeNull =
+        withE1RM.length === 0
+          ? null
+          : withE1RM.reduce((best, current) => {return current[1]! > best[1]! ? current : best});
+      if (bestSetByE1RMMaybeNull === null || bestSetByE1RMMaybeNull[1] === null) {
+        bestSetByE1RM = null;
+      } else {
+        bestSetByE1RM = [bestSetByE1RMMaybeNull[0], changeWeightUnit(bestSetByE1RMMaybeNull[1], 'kg', bestSetByE1RMMaybeNull[0].weight_unit)];
+      }
+    }
+    
+    return <ClosableModal
+      visible={advancedExercise !== null}
+      onRequestClose={() => setAdvancedExercise(null)}
+      scrollViewProps={{ contentContainerStyle: {gap: spacing.md} }}
+    >
+      <Text
+        style={{
+          ...typography.section,
+          borderBottomWidth: 2,
+          borderBottomColor: colors.border,
+          marginBottom: spacing.sm,
+          paddingBottom: spacing.padding_sm,
+        }}
+      >
+        Advanced Logging for {exercise.exercise.name} - Exercise {exerciseIdx + 1}
+      </Text>
+      <Text style={{
+          ...typography.subsection,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          marginBottom: spacing.sm,
+          paddingBottom: spacing.padding_sm,
+        }}
+      >
+        Options
+      </Text>
+      {allowEditing && exercises.length > 1 && <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 1,
+        }}
+      >
+        <Text style={{...typography.body, marginRight: spacing.md}}>
+          Move Exercise:</Text>
+        {exerciseIdx !== 0 && (
+          <Button
+            title="&uarr;"
+            onPress={() =>
+              handleSwapExercisePositions(
+                exerciseIdx - 1,
+                exerciseIdx,
+              )
+            }
+            variant="secondary"
+            style={{ padding: 4 }}
+            textProps={{ style: { fontSize: 12 } }}
+            disabled={isLoading || !allowEditing}
+          />
+        )}
+        {exerciseIdx !== exercises.length - 1 && (
+          <Button
+            title="&darr;"
+            onPress={() =>
+              handleSwapExercisePositions(
+                exerciseIdx,
+                exerciseIdx + 1,
+              )
+            }
+            variant="secondary"
+            style={{ padding: 4 }}
+            textProps={{ style: { fontSize: 12 } }}
+            disabled={isLoading || !allowEditing}
+          />
+        )}
+        {setsForExercise.length === 0 && (
+          <Button
+            title="&times;"
+            onPress={() => handleRemoveExercise(exerciseIdx)}
+            variant="revert"
+            style={{ padding: 4 }}
+            textProps={{ style: { fontSize: 12 } }}
+            disabled={
+              setsForExercise.length > 0 || isLoading || !allowEditing
+            }
+          />
+        )}
+      </View>}
+      <View>
+        <Text style={typography.body}>Notes:</Text>
+        <TextField
+          multiline
+          value={exercise.notes ?? ""}
+          onChangeText={(text) => handleUpdateExercise(exerciseIdx, 'notes', text)}
+          placeholder="Any notes about this workout (RPE goals, cues, etc.)"
+          placeholderTextColor={colors.placeholderTextColor}
+          style={{
+            ...typography.body,
+            marginTop: 4,
+            minHeight: 80,
+            textAlignVertical: "top",
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 8,
+            paddingHorizontal: 8,
+            paddingVertical: 6,
+          }}
+          editable={!isLoading && allowEditing}
+        />
+      </View>
+      <Text style={{
+          ...typography.subsection,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          marginBottom: spacing.sm,
+          paddingBottom: spacing.padding_sm,
+        }}
+      >
+        Metrics
+      </Text>
+      { isLogWorkout(workout) && (
+          bestSetByE1RM !== null ? (
+            <View>
+              <View
+                style={{
+                  borderRadius: 10,
+                  padding: spacing.padding_sm,
+                  backgroundColor: colors.fadedPrimary,
+                  marginBottom: spacing.xs,
+                }}
+              >
+                <Text style={typography.body}>
+                  Best Set: <Text style={{ fontWeight: "700" }}>{bestSetByE1RM[0].weight?.toFixed(1)} {bestSetByE1RM[0].weight_unit}{bestSetByE1RM[0].weight === 1 ? '' : 's'} &times; {bestSetByE1RM[0].reps}{bestSetByE1RM[0].rpe !== null ? ` @ RPE ${bestSetByE1RM[0].rpe}` : ''}</Text>
+                </Text>
+                <Text style={typography.body}>
+                  Estimated One Rep Max (e1RM): <Text style={{ fontWeight: "700" }}>{bestSetByE1RM[1].toFixed(1)} {bestSetByE1RM[0].weight_unit}{bestSetByE1RM[1] === 1 ? '' : 's'}</Text>
+                </Text>
+                <Text style={{...typography.hint, marginTop: spacing.sm}}>
+                  Only sets with 1-12 reps were considered. Sets with no RPE were defaulted to RPE 10 (max effort).
+                </Text>
+              </View>
+            </View>
+          ) : (<Text style={typography.body}>Enter sets with weights and reps (1-12) to track your best set.</Text>)
+      )
+      }
+      <Button
+        title="Close"
+        onPress={() => setAdvancedExercise(null)}
+      />
+      {allowEditing && <Button
+        title={`Delete Exercise${setsForExercise.length > 0 ? ' - Remove sets first' : ''}`}
+        onPress={() => {
+          handleRemoveExercise(exerciseIdx);
+        }}
+        variant="revert"
+        disabled={!allowEditing || isLoading || setsForExercise.length > 0}
+      />}
+    </ClosableModal>
+  }
 
   const renderExercisesSection = () => {
     return (
@@ -922,11 +1014,11 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             marginBottom: 8,
           }}
         >
-          <Text style={typography.section}>Exercises</Text>
+          <Text style={{...typography.title, color: colors.teal}}>Exercises</Text>
           {allowEditing && (
             <View style={{ marginLeft: "auto", alignItems: "center" }}>
               <Button
-                title="+"
+                title="Add Exercise"
                 onPress={() => {
                   setOpenExercisePicker(true);
                   setExercisePickerFunction(
@@ -950,7 +1042,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
 
         {exercises.length === 0 ? (
           <Text style={typography.hint}>
-            No exercises added yet. Tap &quot;+&quot; to build this workout.
+            No exercises added yet. Tap &quot;Add Exercise&quot; to build this workout.
           </Text>
         ) : (
           exercises.map((ex, exerciseIdx) => {
@@ -961,7 +1053,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 style={{
                   paddingVertical: 8,
                   borderBottomWidth: 1,
-                  marginBottom: 16,
+                  marginBottom: spacing.md,
                   borderColor: colors.border,
                 }}
               >
@@ -969,27 +1061,31 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    marginBottom: 6,
+                    marginBottom: spacing.xs,
                     flexWrap: "wrap",
                   }}
                 >
-                  <Text style={{ ...typography.subsection, marginRight: 10 }}>
-                    {exerciseIdx + 1}
-                    {")"}
+                  <Text style={{ ...typography.subsection, marginRight: 10, color: colors.orange }}>
+                    {exerciseIdx + 1}. {ex.exercise.name}
                   </Text>
-                  <Text style={typography.subsection}>{ex.exercise.name}</Text>
                   <Text
-                    style={[typography.body, { marginLeft: 8, marginRight: 8 }]}
+                    style={{...typography.body, color: colors.textPrimary}}
                   >
                     - {setsForExercise.length} set
                     {setsForExercise.length === 1 ? "" : "s"}
                   </Text>
+                  <Pressable
+                    onPress={() => setAdvancedExercise(exerciseIdx)}
+                    style={{ marginLeft: 'auto' }}
+                  >
+                    <Feather name="more-horizontal" size={24} color="black" />
+                  </Pressable>
                 </View>
                 <View
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    marginBottom: 4,
+                    marginBottom: spacing.md,
                   }}
                 >
                   <Selection
@@ -1029,32 +1125,30 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                     disabled={isLoading || !allowEditing}
                   />
                   {ex.superset_group !== null && (
-                    <View style={{ width: 40 }}>
-                      <NumberField
-                        numberValue={ex.superset_group}
-                        onChangeNumber={(value) => {
-                          if (value !== null && value >= 1) {
-                            handleUpdateExercise(
-                              exerciseIdx,
-                              "superset_group",
-                              value,
-                            );
-                          }
-                        }}
-                        numberType={"int"}
-                        style={{
-                          ...typography.hint,
-                          flex: 1,
-                          borderBottomWidth: 1,
-                          borderColor: colors.border,
-                          marginLeft: 6,
-                          padding: 4,
-                        }}
-                        editable={!isLoading && allowEditing}
-                      />
-                    </View>
+                    <NumberField
+                      numberValue={ex.superset_group}
+                      onChangeNumber={(value) => {
+                        if (value !== null && value >= 1) {
+                          handleUpdateExercise(
+                            exerciseIdx,
+                            "superset_group",
+                            value,
+                          );
+                        }
+                      }}
+                      numberType={"int"}
+                      style={{
+                        ...typography.hint,
+                        width: 30,
+                        borderBottomWidth: 1,
+                        borderColor: colors.border,
+                        marginLeft: 6,
+                        padding: 4,
+                      }}
+                      editable={!isLoading && allowEditing}
+                    />
                   )}
-                  <Button
+                  {allowEditing && <Button
                     title={"Add Set"}
                     onPress={() => handleAddSet(exerciseIdx)}
                     style={{ marginLeft: "auto", padding: 4 }}
@@ -1065,49 +1159,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                       },
                     }}
                     disabled={!allowEditing}
-                  />
-                  {exerciseIdx !== 0 && (
-                    <Button
-                      title="&uarr;"
-                      onPress={() =>
-                        handleSwapExercisePositions(
-                          exerciseIdx - 1,
-                          exerciseIdx,
-                        )
-                      }
-                      variant="secondary"
-                      style={{ padding: 4 }}
-                      textProps={{ style: { fontSize: 12 } }}
-                      disabled={isLoading || !allowEditing}
-                    />
-                  )}
-                  {exerciseIdx !== exercises.length - 1 && (
-                    <Button
-                      title="&darr;"
-                      onPress={() =>
-                        handleSwapExercisePositions(
-                          exerciseIdx,
-                          exerciseIdx + 1,
-                        )
-                      }
-                      variant="secondary"
-                      style={{ padding: 4 }}
-                      textProps={{ style: { fontSize: 12 } }}
-                      disabled={isLoading || !allowEditing}
-                    />
-                  )}
-                  {setsForExercise.length === 0 && (
-                    <Button
-                      title="&times;"
-                      onPress={() => handleRemoveExercise(exerciseIdx)}
-                      variant="revert"
-                      style={{ padding: 4 }}
-                      textProps={{ style: { fontSize: 12 } }}
-                      disabled={
-                        setsForExercise.length > 0 || isLoading || !allowEditing
-                      }
-                    />
-                  )}
+                  />}
                 </View>
                 {setsForExercise.length === 0 ? (
                   <Text style={typography.hint}>
@@ -1123,66 +1175,72 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             );
           })
         )}
+      {renderAdvancedExercise()}
       </View>
     );
   };
 
   const handleSave = async () => {
     setIsLoading(true);
-    if (workout.name.length === 0) {
-      showAlert("Please add a workout name");
-      return;
-    }
+
+    const finalWorkout =
+      workout.name.length === 0
+        ? { ...workout, name: "Untitled Workout" }
+        : workout;
+
+    if (finalWorkout !== workout) setWorkout(finalWorkout);
+
     try {
       const payload: FullDetachedWorkoutForMode<M> = {
-        workout,
+        workout: finalWorkout,
         exercises,
         sets,
       };
-      let success: boolean = false;
+
+      let success = false;
+      let savedWorkout = finalWorkout;
+      let savedExercises = exercises;
+      let savedSets = sets;
+
       if (isFullTemplateWorkout(payload)) {
         success = await upsertTemplateWorkout(payload, updateWorkoutId);
+
       } else if (isFullLogWorkout(payload)) {
         const user = await requireGetUser();
         if (!user) return;
-        const workout = { ...payload.workout, user_id: user.user_id };
+
+        const workoutWithUser = { ...payload.workout, user_id: user.user_id };
         const [wasSuccess, newId] = await upsertWorkoutLog({
           payload: {
-            workout,
+            workout: workoutWithUser,
             exercises: payload.exercises,
             sets: payload.sets,
           },
           workoutLogId: updateWorkoutId,
         });
-        if (wasSuccess) {
-          if (newId === null) {
-            throw new Error("Had successful upsert but new id was null");
-          }
-          onSuccessfulSave({ workout, exercises, sets }, newId);
-        }
+
         success = wasSuccess;
+
+        if (success) {
+          if (newId === null) throw new Error("Had successful upsert but new id was null");
+          savedWorkout = workoutWithUser;
+          onSuccessfulSave({ workout: workoutWithUser, exercises: savedExercises, sets: savedSets }, newId);
+        }
+
       } else {
-        throw new Error(`Unknown full workout mode: ${payload}`);
+        throw new Error(`Unknown full workout mode: ${JSON.stringify(payload)}`);
       }
 
       if (success) {
         showAlert("Successfully saved workout!");
-        initialWorkoutRef.current = workout;
-        initialExercisesRef.current = exercises;
-        initialSetsRef.current = sets;
-        if (requestCloseOnSuccessfulSave) {
-          requestClose();
-        }
+        initialWorkoutRef.current = savedWorkout;
+        initialExercisesRef.current = savedExercises;
+        initialSetsRef.current = savedSets;
+
+        if (requestCloseOnSuccessfulSave) requestClose();
       }
-    } catch (e: any) {
-      console.log(e);
-      const message =
-        e instanceof Error
-          ? e.message
-          : e && typeof e === "object" && "message" in e
-            ? String(e.message)
-            : String(e);
-      showAlert("Error saving", message);
+    } catch (e: unknown) {
+      showAlert("Error saving", anyErrorToString(e, 'Could not convert error to string. Check logs'));
     } finally {
       setIsLoading(false);
     }
@@ -1267,4 +1325,14 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       </View>
     </Screen>
   );
+}
+
+const styles = {
+  pressable: {
+    borderRadius: 999,
+    borderColor: colors.border,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+    padding: spacing.padding_md,
+  }
 }

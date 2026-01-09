@@ -2,7 +2,7 @@ import { colors } from "./colors";
 
 export const typography = {
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "700" as const,
     color: colors.textPrimary,
   },

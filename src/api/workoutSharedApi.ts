@@ -67,6 +67,9 @@ export type WorkoutSetTableName<M extends WorkoutEditorMode> = M extends "log"
   ? "workout_exercise_set_log"
   : "workout_exercise_set_template";
 
+export type EditablePerformanceType<M extends WorkoutEditorMode> = ModeTypes<M>['SetRow']["performance_type"];
+
+
 export function isFullLogWorkout(
   fw: FullDetachedWorkoutForMode<WorkoutEditorMode>,
 ): fw is FullDetachedWorkoutForMode<"log"> {
