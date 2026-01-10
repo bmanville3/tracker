@@ -1,10 +1,12 @@
 import { StyleSheet, Text, View } from "react-native";
 import { colors, spacing, typography } from "../theme";
 
-export function ErrorBanner({ errorText }: {errorText: string}) {
-  return <View style={styles.errorBanner}>
-    <Text style={styles.errorText}>{errorText}</Text>
-  </View>
+export function ErrorBanner({ errorText }: { errorText: string }) {
+  return (
+    <View style={styles.errorBanner}>
+      <Text style={styles.errorText}>{errorText}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

@@ -1,8 +1,8 @@
 import {
   DistanceUnit,
-  PerformanceType,
   RPE,
   SetType,
+  TimeUnit,
   WeightUnit,
   WorkoutType,
 } from "./enums";
@@ -23,7 +23,6 @@ export type AbstractWorkout = {
   id: UUID;
   name: string;
   notes: string;
-  bodyweight_kg: number | null;
   workout_type: WorkoutType;
 };
 
@@ -31,7 +30,12 @@ export type WorkoutLogRow = AbstractWorkout &
   AllOrNothing<AssociatedProgramFields> & {
     user_id: UUID;
     completed_on: ISODate;
-    duration_seconds: number | null;
+
+    duration: number | null;
+    duration_unit: TimeUnit;
+
+    bodyweight: number | null;
+    bodyweight_unit: WeightUnit;
   };
 
 export type WorkoutTemplateRow = AbstractWorkout & AssociatedProgramFields & {};
@@ -67,32 +71,51 @@ export type AbstractWorkoutExerciseSet = {
 
   weight_unit: WeightUnit;
   distance_unit: DistanceUnit;
+  time_unit: TimeUnit;
 
   set_type: SetType;
-  duration_seconds: number | null;
-  performance_type: PerformanceType;
   rest_seconds_before: number | null;
 };
 
 export type PossiblePerformanceSetFields = {
-  performance_type: PerformanceType;
+  performance_type: string;
   percentage_of_max: null;
   max_percentage_exercise_id: null;
   reps: null;
   rpe: null;
   weight: null;
   distance_per_rep: null;
-  duration_seconds: null;
+  duration: null;
 };
+
+export const LOG_PERFORMANCE_TYPES = ["weight", "movement"] as const;
+
+export type LogPerformanceType = (typeof LOG_PERFORMANCE_TYPES)[number];
+
+export type PossiblePerformanceSetLogFields = PossiblePerformanceSetFields & {
+  performance_type: LogPerformanceType;
+};
+
+export const TEMPLATE_PERFORMANCE_TYPES = [
+  "rpe",
+  "percentage",
+  "distance_only",
+  "time_only",
+  "distance_and_time",
+] as const;
+
+export type TemplatePerformanceType =
+  (typeof TEMPLATE_PERFORMANCE_TYPES)[number];
+
+// compile time assertion that template and log never overlap
+type AssertNever<T extends never> = T;
+type _NoOverlap = AssertNever<
+  Extract<LogPerformanceType, TemplatePerformanceType>
+>;
 
 ///////////
 // full workout+exercise+set fields for template
 ///////////
-
-export type TemplatePerformanceType = Extract<
-  PerformanceType,
-  "percentage" | "rpe"
->;
 
 export type PossiblePerformanceSetTemplateFields =
   PossiblePerformanceSetFields & {
@@ -125,24 +148,27 @@ export type WorkoutExerciseSetTemplateRow = AbstractWorkoutExerciseSet &
 // full workout+exercise+set fields for logs
 ///////////
 
-export type LogPerformanceType = Extract<PerformanceType, "weight">;
-
-export type PossiblePerformanceSetLogFields = PossiblePerformanceSetFields & {
-  performance_type: LogPerformanceType;
-};
-
 export type WeightLogSet = Omit<
   PossiblePerformanceSetLogFields,
-  "rpe" | "reps" | "weight" | "duration_seconds"
+  "rpe" | "reps" | "weight" | "duration"
 > & {
   performance_type: "weight";
   weight: number | null;
   reps: number | null;
   rpe: RPE | null;
-  duration_seconds: number | null;
+  duration: number | null;
+};
+
+export type DistnaceLogSet = Omit<
+  PossiblePerformanceSetLogFields,
+  "duration" | "distance_per_rep" | "reps" | "weight"
+> & {
+  performance_type: "movement";
+  duration: number | null;
+  distance_per_rep: number | null;
+  reps: number | null;
+  weight: number | null;
 };
 
 export type WorkoutExerciseSetLogRow = AbstractWorkoutExerciseSet &
-  WeightLogSet & {
-    is_complete: boolean;
-  };
+  (WeightLogSet | DistnaceLogSet);

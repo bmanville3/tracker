@@ -83,12 +83,17 @@ export default function ResetPassword() {
             placeholder="••••••••"
           />
 
-          {errorMessage && <ErrorBanner errorText={errorMessage}/>}
+          {errorMessage && <ErrorBanner errorText={errorMessage} />}
 
           <Button
             title={isLoading ? "Updating…" : "Update password"}
             onPress={onSetPassword}
-            disabled={isLoading || newPassword.length === 0 || confirm.length === 0 || newPassword !== confirm}
+            disabled={
+              isLoading ||
+              newPassword.length === 0 ||
+              confirm.length === 0 ||
+              newPassword !== confirm
+            }
             variant="primary"
             style={{ marginTop: 12 }}
           />

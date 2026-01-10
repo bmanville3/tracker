@@ -4,7 +4,7 @@ import { MINUTE_MS } from "./constants";
 import { supabase } from "./supabase";
 import { CACHE_FACTORY } from "./swrCache";
 import { ISODate, ProfileRow, UUID } from "./types";
-import { DistanceUnit, WeightUnit } from "./types/enums";
+import { DistanceUnit, TimeUnit, WeightUnit } from "./types/enums";
 
 const TTL_MS = 1 * MINUTE_MS;
 type WrappedProfile = ProfileRow & { id: UUID };
@@ -44,9 +44,7 @@ export async function getUser(): Promise<ProfileRow | null> {
         throw new Error("No profile found");
       }
       const fetchedProfile: ProfileRow = profile;
-      return [
-        { ...fetchedProfile, id: fetchedProfile.user_id },
-      ];
+      return [{ ...fetchedProfile, id: fetchedProfile.user_id }];
     });
     return [...wrappedProfile.values()].at(0) ?? null;
   } catch (e: unknown) {
@@ -156,6 +154,20 @@ export function changeDistanceUnit(
   return changeUnit(distance, sourceUnit, targetUnit, TO_METERS);
 }
 
+const TO_SECONDS: Record<TimeUnit, number> = {
+  sec: 1,
+  min: 60,
+  hr: 3600,
+};
+
+export function changeTimeUnit(
+  time: number,
+  sourceUnit: TimeUnit,
+  targetUnit: TimeUnit,
+): number {
+  return changeUnit(time, sourceUnit, targetUnit, TO_SECONDS);
+}
+
 export function isSubsetOf<T>(a: Set<T>, b: Set<T>): boolean {
   if (a === b) {
     return true;
@@ -228,13 +240,12 @@ export function tripleArraysEqual<T>(
 
 export function anyErrorToString(e: any, fallback: string): string {
   return e instanceof Error
-      ? e.message
-      : typeof e === "string"
+    ? e.message
+    : typeof e === "string"
       ? e
       : e?.message || fallback;
 }
 
-export type OmitNever<T, K extends keyof T> =
-  Omit<T, K> & {
-    [P in K]?: never;
-  };
+export type OmitNever<T, K extends keyof T> = Omit<T, K> & {
+  [P in K]?: never;
+};

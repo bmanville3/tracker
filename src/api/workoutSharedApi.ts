@@ -2,7 +2,11 @@ import {
   AllOrNothing,
   AssociatedProgramFields,
   ExerciseRow,
+  LOG_PERFORMANCE_TYPES,
+  LogPerformanceType,
   ProgramRow,
+  TEMPLATE_PERFORMANCE_TYPES,
+  TemplatePerformanceType,
   WorkoutExerciseLogRow,
   WorkoutExerciseSetLogRow,
   WorkoutExerciseSetTemplateRow,
@@ -26,17 +30,21 @@ export type ModeTypes<M extends WorkoutEditorMode> = M extends "template"
       SetRow: WorkoutExerciseSetLogRow;
     };
 
-export type CompleteProgram = OmitNever<AssociatedProgramFields, "program_id"> & {
+export type CompleteProgram = OmitNever<
+  AssociatedProgramFields,
+  "program_id"
+> & {
   program_row: ProgramRow;
 };
 
 export type EditableProgramFields<M extends WorkoutEditorMode> =
   M extends "template" ? CompleteProgram : AllOrNothing<CompleteProgram>;
 
-export type EditableWorkout<M extends WorkoutEditorMode> =
-  Omit<ModeTypes<M>["WorkoutRow"], 'id' | keyof AssociatedProgramFields>
-  & EditableProgramFields<M>
-  & {'id'?: never};
+export type EditableWorkout<M extends WorkoutEditorMode> = Omit<
+  ModeTypes<M>["WorkoutRow"],
+  "id" | keyof AssociatedProgramFields
+> &
+  EditableProgramFields<M> & { id?: never };
 
 export type EditableExercise<M extends WorkoutEditorMode> = OmitNever<
   ModeTypes<M>["ExerciseRow"],
@@ -67,8 +75,8 @@ export type WorkoutSetTableName<M extends WorkoutEditorMode> = M extends "log"
   ? "workout_exercise_set_log"
   : "workout_exercise_set_template";
 
-export type EditablePerformanceType<M extends WorkoutEditorMode> = ModeTypes<M>['SetRow']["performance_type"];
-
+export type EditablePerformanceType<M extends WorkoutEditorMode> =
+  ModeTypes<M>["SetRow"]["performance_type"];
 
 export function isFullLogWorkout(
   fw: FullDetachedWorkoutForMode<WorkoutEditorMode>,
@@ -120,7 +128,10 @@ export function editableWorkoutEqual<M extends WorkoutEditorMode>(
   if (isLogWorkout(a) && isLogWorkout(b)) {
     if (
       a.user_id !== b.user_id ||
-      a.duration_seconds !== b.duration_seconds ||
+      a.duration !== b.duration ||
+      a.duration_unit !== b.duration_unit ||
+      a.bodyweight !== b.bodyweight ||
+      a.bodyweight_unit !== b.bodyweight_unit ||
       a.completed_on !== b.completed_on
     ) {
       return false;
@@ -135,7 +146,6 @@ export function editableWorkoutEqual<M extends WorkoutEditorMode>(
   const sameScalars =
     a.name === b.name &&
     a.notes === b.notes &&
-    a.bodyweight_kg === b.bodyweight_kg &&
     a.workout_type === b.workout_type;
 
   if (!sameScalars) return false;
@@ -163,13 +173,17 @@ export type AnyEditableSet = EditableSet<WorkoutEditorMode>;
 export function isLogSet(
   s: EditableSet<WorkoutEditorMode>,
 ): s is EditableSet<"log"> {
-  return "is_complete" in s;
+  return LOG_PERFORMANCE_TYPES.includes(
+    s.performance_type as LogPerformanceType,
+  );
 }
 
 export function isTemplateSet(
   s: EditableSet<WorkoutEditorMode>,
 ): s is EditableSet<"template"> {
-  return !("is_complete" in s);
+  return TEMPLATE_PERFORMANCE_TYPES.includes(
+    s.performance_type as TemplatePerformanceType,
+  );
 }
 
 // having to use this here
@@ -182,7 +196,8 @@ export function editableSetEqual(
     a.weight_unit !== b.weight_unit ||
     a.distance_unit !== b.distance_unit ||
     a.set_type !== b.set_type ||
-    a.duration_seconds !== b.duration_seconds ||
+    a.duration !== b.duration ||
+    a.time_unit !== b.time_unit ||
     a.performance_type !== b.performance_type ||
     a.percentage_of_max !== b.percentage_of_max ||
     a.max_percentage_exercise_id !== b.max_percentage_exercise_id ||
@@ -195,7 +210,6 @@ export function editableSetEqual(
   }
 
   if (isLogSet(a) && isLogSet(b)) {
-    if (a.is_complete !== b.is_complete) return false;
     return true;
   }
 

@@ -30,7 +30,8 @@ export default function WorkoutLogIndex() {
     useState<FullDetachedWorkoutForMode<"log"> | null>(null);
   const [updateId, setUpdateId] = useState<UUID | null>(null);
   const [allowEdit, setAllowEdit] = useState<boolean>(false);
-  const [confirmDelete, setConfirmDelete] = useState<FullAttachedWorkoutLog | null>(null);
+  const [confirmDelete, setConfirmDelete] =
+    useState<FullAttachedWorkoutLog | null>(null);
 
   const [displayedWorkouts, setDisplayedWorkouts] = useState<
     FullAttachedWorkoutLog[]
@@ -71,7 +72,9 @@ export default function WorkoutLogIndex() {
       for (const i in fw.exercises) {
         const ex = fw.exercises[i];
         const sets = fw.sets[i];
-        names.push(`${ex.exercise.name} \u00D7 ${sets.length} Set${sets.length === 1 ? '' : 's'}`);
+        names.push(
+          `${ex.exercise.name} \u00D7 ${sets.length} Set${sets.length === 1 ? "" : "s"}`,
+        );
         if (names.length >= 2) break;
       }
 
@@ -136,24 +139,24 @@ export default function WorkoutLogIndex() {
         <View>
           <Text style={styles.headerTitle}>Workout Log</Text>
           <Text style={styles.headerSubtitle}>
-            Review and manage your recent training{"\n"}sessions.
-            Click on a workout to view it.
+            Review and manage your recent training{"\n"}sessions. Click on a
+            workout to view it.
           </Text>
         </View>
 
         <Button
           title={"Log workout"}
           onPress={openCreateWorkout}
-          variant='primary'
-          style={{marginLeft: "auto", borderRadius: 999, padding: 10}}
-          textProps={{ style: { ...typography.hint, color: colors.textOnPrimary } }}
+          variant="primary"
+          style={{ marginLeft: "auto", borderRadius: 999, padding: 10 }}
+          textProps={{
+            style: { ...typography.hint, color: colors.textOnPrimary },
+          }}
         />
       </View>
 
       {/* Error banner */}
-      {errorText ? (
-        <ErrorBanner errorText={errorText}/>
-      ) : null}
+      {errorText ? <ErrorBanner errorText={errorText} /> : null}
 
       {/* Content: loading / list / empty state */}
       <View>
@@ -181,7 +184,11 @@ export default function WorkoutLogIndex() {
                     <Text style={typography.hint}>
                       {w.completed_on ?? "Uncompleted workout"}
                     </Text>
-                    <Text style={{...typography.subsection, color: colors.navy}}>{w.name ? w.name : "Untitled Workout"}</Text>
+                    <Text
+                      style={{ ...typography.subsection, color: colors.navy }}
+                    >
+                      {w.name ? w.name : "Untitled Workout"}
+                    </Text>
                   </View>
 
                   <View style={styles.iconRow}>
@@ -210,13 +217,13 @@ export default function WorkoutLogIndex() {
                   </View>
                 </View>
                 <Text style={typography.hint}>
-                  {fw.exercises.length} Exercise{fw.exercises.length === 1 ? '' : 's'} | {totalSets} Set{totalSets === 1 ? '' : 's'}
+                  {fw.exercises.length} Exercise
+                  {fw.exercises.length === 1 ? "" : "s"} | {totalSets} Set
+                  {totalSets === 1 ? "" : "s"}
                 </Text>
 
                 {/* Preview of exercises */}
-                <Text
-                  style={typography.hint}
-                >
+                <Text style={typography.hint}>
                   {preview || "No exercises logged"}
                 </Text>
 
@@ -249,8 +256,9 @@ export default function WorkoutLogIndex() {
         visible={confirmDelete !== null}
         onRequestClose={() => setConfirmDelete(null)}
       >
-        <Text style={{...typography.section, marginBottom: 10}}>
-          Delete Workout Log: "{confirmDelete?.workout.name}" completed on {confirmDelete?.workout.completed_on}
+        <Text style={{ ...typography.section, marginBottom: 10 }}>
+          Delete Workout Log: "{confirmDelete?.workout.name}" completed on{" "}
+          {confirmDelete?.workout.completed_on}
         </Text>
         <Button
           title={"Cancel Delete"}
@@ -268,14 +276,20 @@ export default function WorkoutLogIndex() {
             setLoading(true);
             deleteWorkoutLog(confirmDelete.logId)
               .then(() => {
-                setDisplayedWorkouts(displayedWorkouts.filter(f => f.logId !== confirmDelete.logId))
+                setDisplayedWorkouts(
+                  displayedWorkouts.filter(
+                    (f) => f.logId !== confirmDelete.logId,
+                  ),
+                );
                 showAlert("Log successfully deleted");
               })
-              .catch((e) => setErrorText(anyErrorToString(e, 'Error deleting workout log')))
+              .catch((e) =>
+                setErrorText(anyErrorToString(e, "Error deleting workout log")),
+              )
               .finally(() => {
                 setConfirmDelete(null);
                 setLoading(false);
-              })
+              });
           }}
           disabled={loading}
         />
@@ -302,7 +316,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...typography.title,
-    color: colors.orange
+    color: colors.orange,
   },
   headerSubtitle: {
     ...typography.hint,

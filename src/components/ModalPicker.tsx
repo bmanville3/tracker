@@ -90,7 +90,12 @@ export function ModalPicker<T>({
       <ClosableModal visible={visible} onRequestClose={() => setVisible(false)}>
         {/* Header */}
         {title && (
-          <Text style={[typography.title, { marginBottom: help ? spacing.xs : spacing.md }]}>
+          <Text
+            style={[
+              typography.title,
+              { marginBottom: help ? spacing.xs : spacing.md },
+            ]}
+          >
             {title}
           </Text>
         )}

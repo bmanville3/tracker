@@ -15,22 +15,142 @@ const MAX_ALLOWED_REPS = Math.max(...RPE_TABLE_REPS);
 export type RpeTableReps = (typeof RPE_TABLE_REPS)[number];
 
 export const RPE_TABLE: Record<RPE, Record<RpeTableReps, number>> = {
-  10:  {1:1.000, 2:0.955, 3:0.922, 4:0.892, 5:0.863, 6:0.837, 7:0.811, 8:0.786, 9:0.762, 10:0.739, 11:0.707, 12:0.680},
-  9.5: {1:0.978, 2:0.939, 3:0.907, 4:0.878, 5:0.850, 6:0.824, 7:0.799, 8:0.774, 9:0.751, 10:0.723, 11:0.694, 12:0.667},
-  9:   {1:0.955, 2:0.922, 3:0.892, 4:0.863, 5:0.837, 6:0.811, 7:0.786, 8:0.762, 9:0.739, 10:0.707, 11:0.680, 12:0.653},
-  8.5: {1:0.939, 2:0.907, 3:0.878, 4:0.850, 5:0.824, 6:0.799, 7:0.774, 8:0.751, 9:0.723, 10:0.694, 11:0.667, 12:0.640},
-  8:   {1:0.922, 2:0.892, 3:0.863, 4:0.837, 5:0.811, 6:0.786, 7:0.762, 8:0.739, 9:0.707, 10:0.680, 11:0.653, 12:0.626},
-  7.5: {1:0.907, 2:0.878, 3:0.850, 4:0.824, 5:0.799, 6:0.774, 7:0.751, 8:0.723, 9:0.694, 10:0.667, 11:0.640, 12:0.613},
-  7:   {1:0.892, 2:0.863, 3:0.837, 4:0.811, 5:0.786, 6:0.762, 7:0.739, 8:0.707, 9:0.680, 10:0.653, 11:0.626, 12:0.599},
-  6.5: {1:0.878, 2:0.850, 3:0.824, 4:0.799, 5:0.774, 6:0.751, 7:0.723, 8:0.694, 9:0.667, 10:0.640, 11:0.613, 12:0.586},
-  6:   {1:0.863, 2:0.837, 3:0.811, 4:0.786, 5:0.762, 6:0.739, 7:0.707, 8:0.680, 9:0.653, 10:0.626, 11:0.599, 12:0.574},
+  10: {
+    1: 1.0,
+    2: 0.955,
+    3: 0.922,
+    4: 0.892,
+    5: 0.863,
+    6: 0.837,
+    7: 0.811,
+    8: 0.786,
+    9: 0.762,
+    10: 0.739,
+    11: 0.707,
+    12: 0.68,
+  },
+  9.5: {
+    1: 0.978,
+    2: 0.939,
+    3: 0.907,
+    4: 0.878,
+    5: 0.85,
+    6: 0.824,
+    7: 0.799,
+    8: 0.774,
+    9: 0.751,
+    10: 0.723,
+    11: 0.694,
+    12: 0.667,
+  },
+  9: {
+    1: 0.955,
+    2: 0.922,
+    3: 0.892,
+    4: 0.863,
+    5: 0.837,
+    6: 0.811,
+    7: 0.786,
+    8: 0.762,
+    9: 0.739,
+    10: 0.707,
+    11: 0.68,
+    12: 0.653,
+  },
+  8.5: {
+    1: 0.939,
+    2: 0.907,
+    3: 0.878,
+    4: 0.85,
+    5: 0.824,
+    6: 0.799,
+    7: 0.774,
+    8: 0.751,
+    9: 0.723,
+    10: 0.694,
+    11: 0.667,
+    12: 0.64,
+  },
+  8: {
+    1: 0.922,
+    2: 0.892,
+    3: 0.863,
+    4: 0.837,
+    5: 0.811,
+    6: 0.786,
+    7: 0.762,
+    8: 0.739,
+    9: 0.707,
+    10: 0.68,
+    11: 0.653,
+    12: 0.626,
+  },
+  7.5: {
+    1: 0.907,
+    2: 0.878,
+    3: 0.85,
+    4: 0.824,
+    5: 0.799,
+    6: 0.774,
+    7: 0.751,
+    8: 0.723,
+    9: 0.694,
+    10: 0.667,
+    11: 0.64,
+    12: 0.613,
+  },
+  7: {
+    1: 0.892,
+    2: 0.863,
+    3: 0.837,
+    4: 0.811,
+    5: 0.786,
+    6: 0.762,
+    7: 0.739,
+    8: 0.707,
+    9: 0.68,
+    10: 0.653,
+    11: 0.626,
+    12: 0.599,
+  },
+  6.5: {
+    1: 0.878,
+    2: 0.85,
+    3: 0.824,
+    4: 0.799,
+    5: 0.774,
+    6: 0.751,
+    7: 0.723,
+    8: 0.694,
+    9: 0.667,
+    10: 0.64,
+    11: 0.613,
+    12: 0.586,
+  },
+  6: {
+    1: 0.863,
+    2: 0.837,
+    3: 0.811,
+    4: 0.786,
+    5: 0.762,
+    6: 0.739,
+    7: 0.707,
+    8: 0.68,
+    9: 0.653,
+    10: 0.626,
+    11: 0.599,
+    12: 0.574,
+  },
 };
 
 export function isWithinRPERepRange(reps: number): boolean {
   return reps >= 1 && reps <= MAX_ALLOWED_REPS;
 }
 
-export function rpeChartPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+export function rpeChartPercentageOfMax(
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
@@ -49,13 +169,17 @@ export function rpeChartPercentageOfMax(reps: number, rpe?: RPE | null): number 
   const lowerVal = table[lower];
   const upperVal = table[upper];
 
-  const frac = reps - lower;   // push to range (0, 1)
+  const frac = reps - lower; // push to range (0, 1)
 
   // say we did 4.3 reps, then we frac = 4.3 - 4 = 0.3 -> lowerVal * (1 - frac) + upperVal * frac = lowerVal * 0.7 + upperVal * 0.3
   return lowerVal * (1 - frac) + upperVal * frac;
 }
 
-export function rpeChartE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+export function rpeChartE1RM(
+  weight: number,
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
@@ -63,14 +187,21 @@ export function rpeChartE1RM(weight: number, reps: number, rpe?: RPE | null): nu
   return percent === null ? null : weight / percent;
 }
 
-export function epleyPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+export function epleyPercentageOfMax(
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
   return 1 / (1 + (reps + (10 - (rpe ?? 10))) / 30);
 }
 
-export function epleyE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+export function epleyE1RM(
+  weight: number,
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
@@ -78,14 +209,21 @@ export function epleyE1RM(weight: number, reps: number, rpe?: RPE | null): numbe
   return percent === null ? null : weight / percent;
 }
 
-export function brzyckiPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+export function brzyckiPercentageOfMax(
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
   return (37 - (reps + (10 - (rpe ?? 10)))) / 36;
 }
 
-export function brzyckiE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+export function brzyckiE1RM(
+  weight: number,
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
@@ -93,21 +231,27 @@ export function brzyckiE1RM(weight: number, reps: number, rpe?: RPE | null): num
   return percent === null ? null : weight / percent;
 }
 
-export function landerPercentageOfMax(reps: number, rpe?: RPE | null): number | null {
+export function landerPercentageOfMax(
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
-  return (101.3 - 2.67123 * (reps + (10 - (rpe ?? 10)))) / 100
+  return (101.3 - 2.67123 * (reps + (10 - (rpe ?? 10)))) / 100;
 }
 
-export function landerE1RM(weight: number, reps: number, rpe?: RPE | null): number | null {
+export function landerE1RM(
+  weight: number,
+  reps: number,
+  rpe?: RPE | null,
+): number | null {
   if (!isWithinRPERepRange(reps)) {
     return null;
   }
   const percent = landerPercentageOfMax(reps, rpe);
   return percent === null ? null : weight / percent;
 }
-
 
 type TableProps = {
   getPercent: (reps: number, rpe?: RPE | null) => number | null;
@@ -179,8 +323,12 @@ function Table({ getPercent }: TableProps) {
   );
 }
 
-
-export const RPE_TABLE_MODES = ["Tuchscherer's Chart", "Epley Formula (1985)", "Brzycki Formula (1993)", "Lander Formula (1985)"] as const;
+export const RPE_TABLE_MODES = [
+  "Tuchscherer's Chart",
+  "Epley Formula (1985)",
+  "Brzycki Formula (1993)",
+  "Lander Formula (1985)",
+] as const;
 export type RpeTableMode = (typeof RPE_TABLE_MODES)[number];
 export const RPE_TABLE_MODE_DESCRIPTIONS: Record<RpeTableMode, string> = {
   "Tuchscherer's Chart":
@@ -196,12 +344,15 @@ export const RPE_TABLE_MODE_DESCRIPTIONS: Record<RpeTableMode, string> = {
     "A historically used but less popular linear model. Mathematically very similar in spirit to Epley: 1RM ≈ weight \u00D7 100 / (101.3 - 2.67123 \u00D7 reps). Useful primarily for comparison or academic curiosity, but rarely preferred as a main training tool today compared to Tuchscherer or Epley.",
 };
 
-export const RPE_TABLE_MODE_TO_PERCENT_FUNCTION: Record<RpeTableMode, (reps: number, rpe?: RPE | null) => number | null> = {
+export const RPE_TABLE_MODE_TO_PERCENT_FUNCTION: Record<
+  RpeTableMode,
+  (reps: number, rpe?: RPE | null) => number | null
+> = {
   "Tuchscherer's Chart": rpeChartPercentageOfMax,
   "Epley Formula (1985)": epleyPercentageOfMax,
   "Brzycki Formula (1993)": brzyckiPercentageOfMax,
-  "Lander Formula (1985)": landerPercentageOfMax
-}
+  "Lander Formula (1985)": landerPercentageOfMax,
+};
 export const RPE_TABLE_MODE_TO_E1RM_FUNCTION: Record<
   RpeTableMode,
   (weight: number, reps: number, rpe?: RPE | null) => number | null
@@ -211,7 +362,6 @@ export const RPE_TABLE_MODE_TO_E1RM_FUNCTION: Record<
   "Brzycki Formula (1993)": brzyckiE1RM,
   "Lander Formula (1985)": landerE1RM,
 };
-
 
 export const TABS = ["Calculator", "Table", "Info", "Compare"] as const;
 export type RpeTableTab = (typeof TABS)[number];
@@ -258,11 +408,15 @@ export function RpeTable({
       ? calcWeight / percent
       : null;
 
-  const dataset = Object.entries(RPE_TABLE_MODE_TO_PERCENT_FUNCTION).map(([k, f]) => {return {key: k, fn: f}});
+  const dataset = Object.entries(RPE_TABLE_MODE_TO_PERCENT_FUNCTION).map(
+    ([k, f]) => {
+      return { key: k, fn: f };
+    },
+  );
 
   const ordered = [
-    ...dataset.filter(d => d.key !== mode),
-    ...dataset.filter(d => d.key === mode),
+    ...dataset.filter((d) => d.key !== mode),
+    ...dataset.filter((d) => d.key === mode),
   ];
 
   const mapToPoints = (fn: (reps: number, rpe?: RPE | null) => number | null) =>
@@ -327,16 +481,23 @@ export function RpeTable({
       {/* TAB CONTENTS */}
       {tab === "Calculator" && (
         <View>
-          <View style={{ flexDirection: 'row', backgroundColor: colors.surfaceAlt, alignSelf: 'flex-start', borderRadius: 999 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: colors.surfaceAlt,
+              alignSelf: "flex-start",
+              borderRadius: 999,
+            }}
+          >
             {WEIGHT_UNITS.map((u) => {
-              const selected = u ===calcUnit;
+              const selected = u === calcUnit;
               return (
                 <Selection
                   key={u}
                   title={u}
                   isSelected={selected}
                   onPress={() => onCalcUnitChange(u)}
-                  style={{ backgroundColor: colors.surface}}
+                  style={{ backgroundColor: colors.surface }}
                 />
               );
             })}
@@ -427,9 +588,11 @@ export function RpeTable({
             </View>
           </View>
 
-          {calcReps !== null && !isWithinRPERepRange(calcReps) && <Text style={{...typography.hint, marginTop: 4}}>
-            Reps must be between 1 and {MAX_ALLOWED_REPS} (inclusive)
-          </Text>}
+          {calcReps !== null && !isWithinRPERepRange(calcReps) && (
+            <Text style={{ ...typography.hint, marginTop: 4 }}>
+              Reps must be between 1 and {MAX_ALLOWED_REPS} (inclusive)
+            </Text>
+          )}
 
           <View style={{ marginTop: spacing.sm }}>
             <View>
@@ -459,20 +622,28 @@ export function RpeTable({
                 </Text>
               </View>
             </View>
-            {e1rm !== null && percent !== null && calcWeight !== null && calcReps !== null && calcRpe !== null ? (
-              <Text style={{...typography.hint, marginTop: 4}}>
-                Calculated {calcWeight.toFixed(1)}{calcUnit}s as {(percent * 100).toFixed(1)}% of 1RM
+            {e1rm !== null &&
+            percent !== null &&
+            calcWeight !== null &&
+            calcReps !== null &&
+            calcRpe !== null ? (
+              <Text style={{ ...typography.hint, marginTop: 4 }}>
+                Calculated {calcWeight.toFixed(1)}
+                {calcUnit}s as {(percent * 100).toFixed(1)}% of 1RM
                 {"\n"}
-                Used {calcWeight.toFixed(1)}{calcUnit}s &times; {calcReps.toFixed(1)} Reps @ RPE {calcRpe}
+                Used {calcWeight.toFixed(1)}
+                {calcUnit}s &times; {calcReps.toFixed(1)} Reps @ RPE {calcRpe}
                 {"\n"}
                 Formula: {mode}
-              </Text>) : <Text style={{...typography.hint, marginTop: 4}}>
+              </Text>
+            ) : (
+              <Text style={{ ...typography.hint, marginTop: 4 }}>
                 Enter a valid weight, reps, and RPE to see an estimated 1RM.
-              </Text>}
+              </Text>
+            )}
           </View>
         </View>
       )}
-
 
       {tab === "Table" && (
         <View>
@@ -489,7 +660,13 @@ export function RpeTable({
             {RPE_TABLE_MODE_DESCRIPTIONS[mode]}
           </Text>
 
-          <View style={{ borderWidth: 1, marginTop: 16, borderColor: colors.border }} />
+          <View
+            style={{
+              borderWidth: 1,
+              marginTop: 16,
+              borderColor: colors.border,
+            }}
+          />
 
           <Text style={typography.label}>RPE Charts</Text>
           <Text style={typography.hint}>
@@ -526,30 +703,47 @@ export function RpeTable({
             data3={mapToPoints(ordered[2].fn)}
             data4={mapToPoints(ordered[3].fn)}
             color1={ordered[0].key === mode ? colors.primary : colors.border}
-            dataPointsColor1={ordered[0].key === mode ? colors.primary : colors.border}
+            dataPointsColor1={
+              ordered[0].key === mode ? colors.primary : colors.border
+            }
             color2={ordered[1].key === mode ? colors.primary : colors.border}
-            dataPointsColor2={ordered[1].key === mode ? colors.primary : colors.border}
+            dataPointsColor2={
+              ordered[1].key === mode ? colors.primary : colors.border
+            }
             color3={ordered[2].key === mode ? colors.primary : colors.border}
-            dataPointsColor3={ordered[2].key === mode ? colors.primary : colors.border}
+            dataPointsColor3={
+              ordered[2].key === mode ? colors.primary : colors.border
+            }
             color4={ordered[3].key === mode ? colors.primary : colors.border}
-            dataPointsColor4={ordered[3].key === mode ? colors.primary : colors.border}
+            dataPointsColor4={
+              ordered[3].key === mode ? colors.primary : colors.border
+            }
             hideDataPoints={false}
           />
-
 
           {/* Legend */}
           <Text style={typography.hint}>
             Each line shows % of 1RM vs reps at RPE 10. The currently selected
             formula ({mode}) is highlighted.
           </Text>
-          <View style={{ borderWidth: 1, borderColor: colors.border, marginTop: spacing.md}}/>
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: colors.border,
+              marginTop: spacing.md,
+            }}
+          />
           <Text style={typography.label}>Comparison of Maxes</Text>
           <Text style={typography.hint}>
-            This chart compares the estimated 1RM from each formula using the same
-            set (weight, reps, RPE) you entered in the calculator.
+            This chart compares the estimated 1RM from each formula using the
+            same set (weight, reps, RPE) you entered in the calculator.
           </Text>
 
-          {e1rm !== null && calcWeight !== null && calcReps !== null && calcRpe !== null && isWithinRPERepRange(calcReps) ? (
+          {e1rm !== null &&
+          calcWeight !== null &&
+          calcReps !== null &&
+          calcRpe !== null &&
+          isWithinRPERepRange(calcReps) ? (
             <>
               {/* Build chart data from the current calculator inputs */}
               <BarChart
@@ -586,11 +780,11 @@ export function RpeTable({
               {/* Small legend / explanation */}
               <View style={{ marginTop: spacing.sm }}>
                 <Text style={typography.hint}>
-                  Max: {e1rm.toFixed(1)}{calcUnit}s - Set used: {calcWeight.toFixed(1)}{calcUnit}s &times; {calcReps.toFixed(1)} Reps @ RPE {calcRpe}
+                  Max: {e1rm.toFixed(1)}
+                  {calcUnit}s - Set used: {calcWeight.toFixed(1)}
+                  {calcUnit}s &times; {calcReps.toFixed(1)} Reps @ RPE {calcRpe}
                 </Text>
-                <Text style={typography.hint}>
-                  Highlighted formula: {mode}
-                </Text>
+                <Text style={typography.hint}>Highlighted formula: {mode}</Text>
               </View>
             </>
           ) : (
@@ -602,24 +796,26 @@ export function RpeTable({
         </View>
       )}
 
-      <View style={{ borderWidth: 1, marginTop: 16, borderColor: colors.border }} />
+      <View
+        style={{ borderWidth: 1, marginTop: 16, borderColor: colors.border }}
+      />
     </View>
   );
 }
 
-export function RpeTableModal(props: Omit<ClosableModalProps, 'children'>) {
+export function RpeTableModal(props: Omit<ClosableModalProps, "children">) {
   const [mode, setMode] = useState<RpeTableMode>("Tuchscherer's Chart");
   const [calcWeight, setCalcWeight] = useState<number | null>(null);
   const [calcReps, setCalcReps] = useState<number | null>(null);
   const [calcRpe, setCalcRpe] = useState<RPE | null>(null);
-  const [calcUnit, setCalcUnit] = useState<WeightUnit>('lb');
-  const [tab, setTab] = useState<RpeTableTab>('Calculator');
+  const [calcUnit, setCalcUnit] = useState<WeightUnit>("lb");
+  const [tab, setTab] = useState<RpeTableTab>("Calculator");
 
   const setInitialUnit = async () => {
     const user = await requireGetUser();
     if (!user) return;
     setCalcUnit(user.default_weight_unit);
-  }
+  };
 
   const resetAll = () => {
     setMode("Tuchscherer's Chart");
@@ -628,20 +824,19 @@ export function RpeTableModal(props: Omit<ClosableModalProps, 'children'>) {
     setCalcRpe(null);
     setTab("Calculator");
     void setInitialUnit();
-  }
+  };
 
   useEffect(() => {
-    resetAll()
-  }, [])
+    resetAll();
+  }, []);
 
-  return <ClosableModal
-      {...props}
-    >
+  return (
+    <ClosableModal {...props}>
       <Button
         title={"\u00D7"}
         variant="secondary"
-        style={{ alignSelf: 'flex-end', padding: 2, borderWidth: 0 }}
-        textProps={{ style: {...typography.body } }}
+        style={{ alignSelf: "flex-end", padding: 2, borderWidth: 0 }}
+        textProps={{ style: { ...typography.body } }}
         onPress={props.onRequestClose}
       />
       <RpeTable
@@ -664,4 +859,5 @@ export function RpeTableModal(props: Omit<ClosableModalProps, 'children'>) {
         onChangeTab={setTab}
       />
     </ClosableModal>
+  );
 }

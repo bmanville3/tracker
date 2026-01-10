@@ -27,7 +27,11 @@ export function ClosableModal({
   scrollViewProps,
   ...modalProps
 }: ClosableModalProps) {
-  const { style: scrollViewStyle, contentContainerStyle, ...rest } = scrollViewProps ?? {};
+  const {
+    style: scrollViewStyle,
+    contentContainerStyle,
+    ...rest
+  } = scrollViewProps ?? {};
   return (
     <Modal transparent animationType="fade" {...modalProps}>
       <KeyboardAvoidingView
@@ -44,7 +48,10 @@ export function ClosableModal({
         <View style={styles.modalWrap} pointerEvents="box-none">
           <View style={[styles.modalCard, sheetStyle]}>
             <ScrollView
-              contentContainerStyle={[{ paddingBottom: spacing.lg }, contentContainerStyle]}
+              contentContainerStyle={[
+                { paddingBottom: spacing.lg },
+                contentContainerStyle,
+              ]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               style={scrollViewStyle}

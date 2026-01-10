@@ -264,60 +264,67 @@ export type Database = {
       };
       workout_exercise_set_log: {
         Row: {
+          distance_per_rep: number | null;
           distance_unit: Database["public"]["Enums"]["distance_unit"];
-          duration_seconds: number | null;
+          duration: number | null;
           id: string;
-          is_complete: boolean;
-          performance_type: Database["public"]["Enums"]["performance_type"];
+          max_percentage_exercise_id: string | null;
+          percentage_of_max: number | null;
+          performance_type: Database["public"]["Enums"]["log_performance_type"];
           reps: number | null;
           rest_seconds_before: number | null;
           rpe: number | null;
           set_index: number;
           set_type: Database["public"]["Enums"]["set_type"] | null;
+          time_unit: Database["public"]["Enums"]["time_unit"];
           weight: number | null;
           weight_unit: Database["public"]["Enums"]["weight_unit"];
           workout_exercise_id: string;
-          distance_per_rep: number | null;
-          percentage_of_max: number | null;
-          max_percentage_exercise_id: string | null;
         };
         Insert: {
+          distance_per_rep?: number | null;
           distance_unit: Database["public"]["Enums"]["distance_unit"];
-          duration_seconds?: number | null;
+          duration?: number | null;
           id?: string;
-          is_complete?: boolean;
-          performance_type: Database["public"]["Enums"]["performance_type"];
+          max_percentage_exercise_id?: string | null;
+          percentage_of_max?: number | null;
+          performance_type: Database["public"]["Enums"]["log_performance_type"];
           reps?: number | null;
           rest_seconds_before?: number | null;
           rpe?: number | null;
           set_index: number;
           set_type?: Database["public"]["Enums"]["set_type"] | null;
+          time_unit?: Database["public"]["Enums"]["time_unit"];
           weight?: number | null;
           weight_unit: Database["public"]["Enums"]["weight_unit"];
           workout_exercise_id: string;
-          distance_per_rep: number | null;
-          percentage_of_max: number | null;
-          max_percentage_exercise_id: string | null;
         };
         Update: {
+          distance_per_rep?: number | null;
           distance_unit?: Database["public"]["Enums"]["distance_unit"];
-          duration_seconds?: number | null;
+          duration?: number | null;
           id?: string;
-          is_complete?: boolean;
-          performance_type?: Database["public"]["Enums"]["performance_type"];
+          max_percentage_exercise_id?: string | null;
+          percentage_of_max?: number | null;
+          performance_type?: Database["public"]["Enums"]["log_performance_type"];
           reps?: number | null;
           rest_seconds_before?: number | null;
           rpe?: number | null;
           set_index?: number;
           set_type?: Database["public"]["Enums"]["set_type"] | null;
+          time_unit?: Database["public"]["Enums"]["time_unit"];
           weight?: number | null;
           weight_unit?: Database["public"]["Enums"]["weight_unit"];
           workout_exercise_id?: string;
-          distance_per_rep?: number | null;
-          percentage_of_max?: number | null;
-          max_percentage_exercise_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "workout_exercise_set_log_max_percentage_exercise_id_fkey";
+            columns: ["max_percentage_exercise_id"];
+            isOneToOne: false;
+            referencedRelation: "exercise";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "workout_exercise_set_log_workout_exercise_id_fkey";
             columns: ["workout_exercise_id"];
@@ -330,10 +337,12 @@ export type Database = {
       workout_log: {
         Row: {
           block_in_program: number | null;
-          bodyweight_kg: number | null;
+          bodyweight: number | null;
+          bodyweight_unit: Database["public"]["Enums"]["weight_unit"];
           completed_on: string;
           day_in_week: number | null;
-          duration_seconds: number | null;
+          duration: number | null;
+          duration_unit: Database["public"]["Enums"]["time_unit"];
           id: string;
           name: string;
           notes: string;
@@ -344,10 +353,12 @@ export type Database = {
         };
         Insert: {
           block_in_program?: number | null;
-          bodyweight_kg?: number | null;
+          bodyweight?: number | null;
+          bodyweight_unit?: Database["public"]["Enums"]["weight_unit"];
           completed_on: string;
           day_in_week?: number | null;
-          duration_seconds?: number | null;
+          duration?: number | null;
+          duration_unit?: Database["public"]["Enums"]["time_unit"];
           id?: string;
           name: string;
           notes?: string;
@@ -358,10 +369,12 @@ export type Database = {
         };
         Update: {
           block_in_program?: number | null;
-          bodyweight_kg?: number | null;
+          bodyweight?: number | null;
+          bodyweight_unit?: Database["public"]["Enums"]["weight_unit"];
           completed_on?: string;
           day_in_week?: number | null;
-          duration_seconds?: number | null;
+          duration?: number | null;
+          duration_unit?: Database["public"]["Enums"]["time_unit"];
           id?: string;
           name?: string;
           notes?: string;
@@ -390,6 +403,7 @@ export type Database = {
     Enums: {
       distance_unit: "m" | "km" | "mi" | "ft" | "yd";
       exercise_and_muscle_tag: "push" | "pull" | "legs" | "upper" | "lower";
+      log_performance_type: "weight" | "movement";
       muscle_group:
         | "chest"
         | "upper_back"
@@ -411,17 +425,9 @@ export type Database = {
         | "hamstrings"
         | "calves"
         | "neck";
-      performance_type:
-        | "percentage"
-        | "rpe"
-        | "distance_weight"
-        | "distance"
-        | "time"
-        | "time_weight"
-        | "time_distance"
-        | "weight";
       program_editor_role: "owner" | "viewer" | "editor";
       set_type: "warmup" | "top" | "backoff";
+      time_unit: "sec" | "min" | "hr";
       trackable_tag: "program";
       weight_unit: "kg" | "lb";
       workout_type: "deload" | "test";
@@ -560,6 +566,7 @@ export const Constants = {
     Enums: {
       distance_unit: ["m", "km", "mi", "ft", "yd"],
       exercise_and_muscle_tag: ["push", "pull", "legs", "upper", "lower"],
+      log_performance_type: ["weight", "movement"],
       muscle_group: [
         "chest",
         "upper_back",
@@ -582,18 +589,9 @@ export const Constants = {
         "calves",
         "neck",
       ],
-      performance_type: [
-        "percentage",
-        "rpe",
-        "distance_weight",
-        "distance",
-        "time",
-        "time_weight",
-        "time_distance",
-        "weight",
-      ],
       program_editor_role: ["owner", "viewer", "editor"],
       set_type: ["warmup", "top", "backoff"],
+      time_unit: ["sec", "min", "hr"],
       trackable_tag: ["program"],
       weight_unit: ["kg", "lb"],
       workout_type: ["deload", "test"],

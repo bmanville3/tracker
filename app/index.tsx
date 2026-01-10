@@ -58,7 +58,7 @@ export default function Index() {
       if (data.session) {
         navigateToApp();
       } else {
-        setErrorMessage("Login failed. No sessions returned.")
+        setErrorMessage("Login failed. No sessions returned.");
       }
     } finally {
       setIsLoading(false);
@@ -71,7 +71,6 @@ export default function Index() {
       showAlert("Missing info", "Please enter your email and password.");
       return;
     }
-
 
     if (password !== confirmPassword) {
       showAlert(
@@ -88,7 +87,7 @@ export default function Index() {
         email: trimmedEmail,
         password,
         options: {
-          emailRedirectTo, 
+          emailRedirectTo,
           data: {
             display_name: displayName,
             default_weight_unit: "lb",
@@ -99,7 +98,9 @@ export default function Index() {
 
       if (error) {
         if (error.message?.toLowerCase().includes("already registered")) {
-          setErrorMessage("You already have an account. Try logging in instead.");
+          setErrorMessage(
+            "You already have an account. Try logging in instead.",
+          );
         } else {
           setErrorMessage(error.message);
         }
@@ -107,7 +108,9 @@ export default function Index() {
       }
 
       if (!data.user) {
-        setErrorMessage("Something went wrong signing you up. Please try again.");
+        setErrorMessage(
+          "Something went wrong signing you up. Please try again.",
+        );
         return;
       }
 
@@ -117,11 +120,13 @@ export default function Index() {
       } else {
         const identities = data.user.identities ?? [];
         if (identities.length > 0) {
-          showAlert("We sent you a confirmation email. Please check your inbox.");
+          showAlert(
+            "We sent you a confirmation email. Please check your inbox.",
+          );
         } else {
           showAlert(
             "You already started signing up before. We've resent your confirmation email—check your inbox.",
-            "If this account is already registered and confirmed, please sign in."
+            "If this account is already registered and confirmed, please sign in.",
           );
           const { error: resendError } = await supabase.auth.resend({
             type: "signup",
@@ -214,7 +219,13 @@ export default function Index() {
           onPress={onForgotPassword}
           disabled={isLoading}
         >
-          <Text style={{ color: colors.placeholderTextColor, fontWeight: "600", marginBottom: 4 }}>
+          <Text
+            style={{
+              color: colors.placeholderTextColor,
+              fontWeight: "600",
+              marginBottom: 4,
+            }}
+          >
             Forgot password?
           </Text>
         </TouchableOpacity>
@@ -224,7 +235,7 @@ export default function Index() {
         <>
           <Text style={typography.label}>Confirm Password</Text>
           <TextField
-           style={{ marginBottom: 10 }}
+            style={{ marginBottom: 10 }}
             secureTextEntry
             value={confirmPassword}
             onChangeText={(text) => setConfirmPassword(text.trim())}
@@ -233,7 +244,7 @@ export default function Index() {
         </>
       )}
 
-      {errorMessage && <ErrorBanner errorText={errorMessage}/>}
+      {errorMessage && <ErrorBanner errorText={errorMessage} />}
 
       <Button
         title={
@@ -247,11 +258,12 @@ export default function Index() {
           setErrorMessage(null);
           isSigningUp ? onSignUp() : onLogin();
         }}
-        disabled={isLoading
-          || password.length === 0
-          || email.length === 0
-          || isSigningUp && (password !== confirmPassword
-          || displayName.length === 0)
+        disabled={
+          isLoading ||
+          password.length === 0 ||
+          email.length === 0 ||
+          (isSigningUp &&
+            (password !== confirmPassword || displayName.length === 0))
         }
         variant="primary"
       />

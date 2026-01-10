@@ -6,7 +6,7 @@ import { useState } from "react";
 export default function HomeScreen() {
   const [displayRpeChart, setDisplayRpeChart] = useState<boolean>(false);
   const [openExerciseEditor, setOpenExerciseEditor] = useState<boolean>(false);
-  
+
   return (
     <Screen>
       <Button

@@ -45,6 +45,10 @@ export const DISTANCE_UNITS = ["m", "km", "mi", "ft", "yd"] as const;
 
 export type DistanceUnit = (typeof DISTANCE_UNITS)[number];
 
+export const TIME_UNITS = ["sec", "min", "hr"] as const;
+
+export type TimeUnit = (typeof TIME_UNITS)[number];
+
 export const TRACKABLE_TAGS = ["program"] as const;
 
 export type TrackableTag = (typeof TRACKABLE_TAGS)[number];
@@ -52,19 +56,6 @@ export type TrackableTag = (typeof TRACKABLE_TAGS)[number];
 export const SET_TYPES = ["warmup", "top", "backoff", null] as const;
 
 export type SetType = (typeof SET_TYPES)[number];
-
-export const PERFORMANCE_TYPES = [
-  "percentage",
-  "rpe",
-  "distance_weight",
-  "distance",
-  "time",
-  "time_weight",
-  "time_distance",
-  "weight",
-] as const;
-
-export type PerformanceType = (typeof PERFORMANCE_TYPES)[number];
 
 export const RPES = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10] as const;
 
