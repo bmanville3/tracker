@@ -73,7 +73,6 @@ function InlineRow(props: {
         {
           flexDirection: "row",
           alignItems: "center",
-          flexWrap: "wrap",
           gap: spacing.xs,
         },
         style,
