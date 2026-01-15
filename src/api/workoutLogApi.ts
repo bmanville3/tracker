@@ -268,7 +268,7 @@ export async function deleteWorkoutLog(workoutId: UUID): Promise<void> {
   WORKOUT_LOG_QUERY_CACHE.clearAll();
 }
 
-export async function fullDetachedWorkoutLogFromWorkoutLogId(
+export async function fullAttachedWorkoutLogFromWorkoutLogId(
   workoutId: UUID,
 ): Promise<FullAttachedWorkoutLog> {
   return WORKOUT_LOG_CACHE.fetch(workoutId, async () => {
@@ -279,11 +279,11 @@ export async function fullDetachedWorkoutLogFromWorkoutLogId(
       .single();
     if (error) throw error;
     let row: WorkoutLogRow = databaseRowToWorkoutLogRow(data);
-    return await fullDetachedWorkoutLogFromWorkoutLogRowCachless(row);
+    return await fullAttachedWorkoutLogFromWorkoutLogRowCachless(row);
   });
 }
 
-export async function fullDetachedWorkoutLogFromWorkoutLogRowCachless(
+export async function fullAttachedWorkoutLogFromWorkoutLogRowCachless(
   workoutLogRow: WorkoutLogRow,
 ): Promise<FullAttachedWorkoutLog> {
   // get the associated program if present
@@ -425,7 +425,7 @@ export async function fetchLastNWorkoutLogs(
   const fullWorkouts = await Promise.all(
     logs.map((log) =>
       WORKOUT_LOG_CACHE.fetch(log.id, () =>
-        fullDetachedWorkoutLogFromWorkoutLogRowCachless(log),
+        fullAttachedWorkoutLogFromWorkoutLogRowCachless(log),
       ),
     ),
   );
@@ -454,7 +454,32 @@ export async function fetchWorkoutLogsOnDate(
   const fullWorkouts = await Promise.all(
     logs.map((log) =>
       WORKOUT_LOG_CACHE.fetch(log.id, () =>
-        fullDetachedWorkoutLogFromWorkoutLogRowCachless(log),
+        fullAttachedWorkoutLogFromWorkoutLogRowCachless(log),
+      ),
+    ),
+  );
+  return fullWorkouts;
+}
+
+export async function fetchWorkoutLogsOnOrAfterDate(
+  date: ISODate,
+): Promise<FullAttachedWorkoutLog[]> {
+  const key = pageKey("fetchWorkoutLogsOnOrAfterDate", { date: date });
+  const logs: WorkoutLogRow[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
+    key,
+    async () => {
+      const { data, error } = await supabase
+        .from("workout_log")
+        .select("*")
+        .gte("completed_on", date);
+      if (error) throw error;
+      return databaseRowsToWorkoutLogRows(data);
+    },
+  );
+  const fullWorkouts = await Promise.all(
+    logs.map((log) =>
+      WORKOUT_LOG_CACHE.fetch(log.id, () =>
+        fullAttachedWorkoutLogFromWorkoutLogRowCachless(log),
       ),
     ),
   );

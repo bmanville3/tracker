@@ -421,9 +421,19 @@ export function RpeTable({
 
   const mapToPoints = (fn: (reps: number, rpe?: RPE | null) => number | null) =>
     RPE_TABLE_REPS.map((reps) => {
-      const p = fn(reps, 10) ?? 0;
-      return { value: p * 100 };
+      const percent = fn(reps, 10)!;
+      const weight = 1 / percent;
+      return { value: weight };
     });
+  
+  const data = ordered.map(v => mapToPoints(v.fn));
+  let avgs = Array.from({ length: RPE_TABLE_REPS.length }, () => 0);
+  let stds = Array.from({ length: RPE_TABLE_REPS.length }, () => 0);
+  data.forEach(calcType => calcType.forEach((rpeVal, i) => avgs[i] += rpeVal.value));
+  avgs = avgs.map(a => a / data.length);
+  data.forEach(calcType => calcType.forEach((rpeVal, i) => stds[i] += Math.pow(rpeVal.value - avgs[i], 2)));
+  stds = stds.map(s => Math.sqrt(s / (data.length - 1)));
+  data.forEach(calcType => calcType.forEach((v, i) => v.value = (v.value - avgs[i]) / stds[i]))
 
   return (
     <View>
@@ -687,21 +697,21 @@ export function RpeTable({
 
       {tab === "Compare" && (
         <View>
-          <Text style={typography.label}>Comparison of Percentages</Text>
+          <Text style={typography.label}>Comparison of e1RM</Text>
           <LineChart
             height={220}
             spacing={30}
             initialSpacing={20}
-            maxValue={36}
-            yAxisOffset={64}
-            yAxisLabelSuffix="%"
+            maxValue={4}
+            yAxisOffset={-2}
+            stepValue={1}
             yAxisTextStyle={typography.hint}
             xAxisLabelTextStyle={typography.hint}
             xAxisLabelTexts={RPE_TABLE_REPS.map((r) => r.toString())}
-            data={mapToPoints(ordered[0].fn)}
-            data2={mapToPoints(ordered[1].fn)}
-            data3={mapToPoints(ordered[2].fn)}
-            data4={mapToPoints(ordered[3].fn)}
+            data={data[0]}
+            data2={data[1]}
+            data3={data[2]}
+            data4={data[3]}
             color1={ordered[0].key === mode ? colors.primary : colors.border}
             dataPointsColor1={
               ordered[0].key === mode ? colors.primary : colors.border
@@ -723,7 +733,7 @@ export function RpeTable({
 
           {/* Legend */}
           <Text style={typography.hint}>
-            Each line shows % of 1RM vs reps at RPE 10. The currently selected
+            Each line shows e1RM vs reps at RPE 10. Z-score scaling has been applied. The currently selected
             formula ({mode}) is highlighted.
           </Text>
           <View

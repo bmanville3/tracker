@@ -1,14 +1,13 @@
-import { MINUTE_MS } from "../constants";
+import { NEVER_CHANGES_RESET_TIME } from "../constants";
 import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import { MuscleGroupRow } from "../types";
 import { MuscleGroup } from "../types/enums";
 import { showAlert } from "../utils";
 
-const TTL_MS = 30 * MINUTE_MS;
 const MUSCLE_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<MuscleGroupRow>(
   "muscleCache",
-  TTL_MS,
+  NEVER_CHANGES_RESET_TIME,
 );
 
 async function fetchAllMuscleGroupsFromDb(): Promise<MuscleGroupRow[]> {

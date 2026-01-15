@@ -1,23 +1,17 @@
-import React from "react";
-import { MINUTE_MS } from "../constants";
+import { NEVER_CHANGES_RESET_TIME } from "../constants";
 import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import { ExerciseMuscleRow, ExerciseRow, UUID } from "../types";
 import { ExerciseAndMuscleTag, MuscleGroup } from "../types/enums";
 import { isSubsetOf, OmitNever, pageKey } from "../utils";
 
-// this data is rarely changed
-// no reason to refetch it all the time
-
-const TTL_MS = 30 * MINUTE_MS;
-
 const EXERCISE_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<ExerciseRow>(
   "exerciseCache",
-  TTL_MS,
+  NEVER_CHANGES_RESET_TIME,
 );
 const EXERCISE_MUSCLE_CACHE = CACHE_FACTORY.getOrCreateSwrKeyedCache<
   Map<MuscleGroup, ExerciseMuscleRow>
->("exerciseMuscleCache", TTL_MS);
+>("exerciseMuscleCache", NEVER_CHANGES_RESET_TIME);
 
 export async function fetchExercises(): Promise<Map<UUID, ExerciseRow>> {
   return EXERCISE_CACHE.fetch(async () => {
@@ -91,8 +85,8 @@ export async function deleteExercise(id: UUID): Promise<void> {
   }
 }
 
-function getPageKeyExerciseMuscle(exericse_id: UUID, user_id: UUID): string {
-  return pageKey("exMc", { exericse_id, user_id });
+function getPageKeyExerciseMuscle(exercise_id: UUID, user_id: UUID): string {
+  return pageKey("exMc", { exercise_id, user_id });
 }
 
 export async function fetchExerciseMuscleVolumes(
@@ -290,33 +284,4 @@ export async function searchExercises(
   });
 
   return [...startsWithRaw, ...startsWithStripped, ...includesPartsOfStripped];
-}
-
-export async function getExerciseAsync(
-  exericse_id: UUID,
-): Promise<ExerciseRow | null> {
-  return (await fetchExercises()).get(exericse_id) ?? null;
-}
-
-export function getExerciseWithState(id: UUID): ExerciseRow | null {
-  const [ex, setEx] = React.useState<ExerciseRow | null>(null);
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const exercise = await getExerciseAsync(id);
-        if (!cancelled) setEx(exercise);
-      } catch {
-        if (!cancelled) setEx(null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  return ex;
 }

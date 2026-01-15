@@ -17,12 +17,14 @@ import {
 
 export type ClosableModalProps = ModalProps & {
   children: React.ReactNode;
+  center?: boolean;
   sheetStyle?: StyleProp<ViewStyle>;
   scrollViewProps?: ScrollViewProps;
 };
 
 export function ClosableModal({
   children,
+  center = false,
   sheetStyle,
   scrollViewProps,
   ...modalProps
@@ -45,7 +47,10 @@ export function ClosableModal({
         />
 
         {/* Sheet/Card */}
-        <View style={styles.modalWrap} pointerEvents="box-none">
+        <View
+          style={center ? styles.modalWrapCenter : styles.modalWrap}
+          pointerEvents="box-none"
+        >
           <View style={[styles.modalCard, sheetStyle]}>
             <ScrollView
               contentContainerStyle={[
@@ -77,6 +82,12 @@ const styles = StyleSheet.create({
   modalWrap: {
     flex: 1,
     justifyContent: "flex-end",
+    padding: spacing.lg,
+  },
+  modalWrapCenter: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
     padding: spacing.lg,
   },
   modalCard: {

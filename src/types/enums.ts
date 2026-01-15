@@ -29,6 +29,7 @@ export const EXERCISE_AND_MUSCLE_TAGS = [
   "legs",
   "upper",
   "lower",
+  "abs",
 ] as const;
 
 export type ExerciseAndMuscleTag = (typeof EXERCISE_AND_MUSCLE_TAGS)[number];
