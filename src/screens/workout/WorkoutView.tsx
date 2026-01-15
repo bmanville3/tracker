@@ -185,6 +185,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
   const initialExercisesRef = useRef<EditableExercise<M>[] | null>(null);
   const initialSetsRef = useRef<EditableSet<M>[][] | null>(null);
 
+  const clearAdvancedExercise = () => {
+    setAdvancedExercise(null);
+    setShowVolumesForAdvancedExercise(false);
+    setEditVolumes(false);
+  }
+
   const resetAll = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -197,9 +203,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       setExercisePickerFunction(null);
       setOpenDatePicker(false);
       setAdvancedSet(null);
-      setAdvancedExercise(null);
-      setEditVolumes(false);
-      setShowVolumesForAdvancedExercise(false);
+      clearAdvancedExercise();
 
       const initial = computeInitialState(strategy, loadWithExisting);
 
@@ -415,7 +419,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     setExercises((prev) => prev.filter((_, i) => i !== index));
     setSets((prev) => prev.filter((_, i) => i !== index));
     if (advancedExercise === index) {
-      setAdvancedExercise(null);
+      clearAdvancedExercise();
     }
     if (advancedSet !== null && advancedSet[0] === index) {
       setAdvancedSet(null);
@@ -658,7 +662,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     return (
       <ClosableModal
         visible={advancedExercise !== null}
-        onRequestClose={() => setAdvancedExercise(null)}
+        onRequestClose={clearAdvancedExercise}
         scrollViewProps={{ contentContainerStyle: { gap: spacing.md } }}
       >
         <Text
@@ -815,14 +819,14 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           ))}
         <View>
           <Button title="Show Volumes" onPress={() => setShowVolumesForAdvancedExercise((prev) => !prev)} variant="secondary"/>
-          {showVolumesForAdvancedExercise && <Button title={`Toggle Editing. Editing Turned: ${editVolume ? 'Off' : 'On'}`} onPress={() => setEditVolumes((prev) => !prev)}/>}
+          {showVolumesForAdvancedExercise && <Button title={`Toggle Editing. Editing Turned: ${editVolume ? 'On' : 'Off'}`} onPress={() => setEditVolumes((prev) => !prev)} variant={editVolume ? "primary" : "secondary"}/>}
         </View>
         {showVolumesForAdvancedExercise && <VolumeRender
           exercise={exercise.exercise}
           onRequestClose={() => setShowVolumesForAdvancedExercise(false)}
           allowEditing={editVolume}
         />}
-        <Button title="Close" onPress={() => setAdvancedExercise(null)} />
+        <Button title="Close" onPress={clearAdvancedExercise} />
         {allowEditing && (
           <Button
             title={`Delete Exercise`}
