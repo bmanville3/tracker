@@ -26,7 +26,7 @@ import {
   Selection,
   TextField,
 } from "@/src/components/";
-import { rpeChartE1RM } from "@/src/components/RPEChart";
+import { rpeChartE1RM } from "@/src/screens/RPEChart";
 import { colors, spacing, typography } from "@/src/theme";
 import { DistanceUnit, ExerciseRow, UUID, WeightUnit } from "@/src/types";
 import {
@@ -40,7 +40,8 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { ExerciseModal } from "../ExerciseModal";
+import { ExerciseModal } from "../exercise/ExerciseModal";
+import { VolumeRender } from "../exercise/VolumeRender";
 
 export type SetRenderProps<M extends WorkoutEditorMode> = {
   set: EditableSet<M>;
@@ -176,6 +177,8 @@ export function WorkoutView<M extends WorkoutEditorMode>(
   const [openDatePicker, setOpenDatePicker] = useState<boolean>(false);
 
   const [advancedExercise, setAdvancedExercise] = useState<number | null>(null);
+  const [showVolumesForAdvancedExercise, setShowVolumesForAdvancedExercise] = useState<boolean>(false);
+  const [editVolume, setEditVolumes] = useState<boolean>(false);
   const [advancedSet, setAdvancedSet] = useState<[number, number] | null>(null);
 
   const initialWorkoutRef = useRef<EditableWorkout<M> | null>(null);
@@ -195,6 +198,8 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       setOpenDatePicker(false);
       setAdvancedSet(null);
       setAdvancedExercise(null);
+      setEditVolumes(false);
+      setShowVolumesForAdvancedExercise(false);
 
       const initial = computeInitialState(strategy, loadWithExisting);
 
@@ -808,6 +813,15 @@ export function WorkoutView<M extends WorkoutEditorMode>(
               (sets must have the 'Weight' performance type).
             </Text>
           ))}
+        <View>
+          <Button title="Show Volumes" onPress={() => setShowVolumesForAdvancedExercise((prev) => !prev)} variant="secondary"/>
+          {showVolumesForAdvancedExercise && <Button title={`Toggle Editing. Editing Turned: ${editVolume ? 'Off' : 'On'}`} onPress={() => setEditVolumes((prev) => !prev)}/>}
+        </View>
+        {showVolumesForAdvancedExercise && <VolumeRender
+          exercise={exercise.exercise}
+          onRequestClose={() => setShowVolumesForAdvancedExercise(false)}
+          allowEditing={editVolume}
+        />}
         <Button title="Close" onPress={() => setAdvancedExercise(null)} />
         {allowEditing && (
           <Button

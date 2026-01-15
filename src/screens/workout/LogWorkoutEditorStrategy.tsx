@@ -10,7 +10,7 @@ import {
   NumberField,
 } from "@/src/components";
 import { CalendarModal } from "@/src/components/CalendarModal";
-import { isWithinRPERepRange, rpeChartE1RM } from "@/src/components/RPEChart";
+import { isWithinRPERepRange, rpeChartE1RM } from "@/src/screens/RPEChart";
 import { colors, spacing, typography } from "@/src/theme";
 import {
   DISTANCE_UNITS,

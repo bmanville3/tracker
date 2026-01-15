@@ -11,6 +11,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { ClosableModal } from "./ClosableModal";
+import { Feather } from "@expo/vector-icons";
 
 export type ModalPickerOption<T> = {
   value: T;
@@ -89,16 +90,19 @@ export function ModalPicker<T>({
       {/* Your existing modal with the options list */}
       <ClosableModal visible={visible} onRequestClose={() => setVisible(false)}>
         {/* Header */}
-        {title && (
-          <Text
-            style={[
-              typography.title,
-              { marginBottom: help ? spacing.xs : spacing.md },
-            ]}
-          >
-            {title}
-          </Text>
-        )}
+        <View style={{ flexDirection: 'row' }}>
+          {title && (
+            <Text
+              style={[
+                typography.title,
+                { marginBottom: help ? spacing.xs : spacing.md },
+              ]}
+            >
+              {title}
+            </Text>
+          )}
+          <Feather name="x" size={22} onPress={() => setVisible(false)} style={{ marginLeft: 'auto' }}/>
+        </View>
         {help && (
           <Text style={[typography.hint, { marginBottom: spacing.md }]}>
             {help}

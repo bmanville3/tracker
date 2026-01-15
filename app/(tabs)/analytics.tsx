@@ -2,7 +2,7 @@ import { fetchExerciseMuscleVolumes } from "@/src/api/exerciseApi";
 import { fetchMuscleGroups } from "@/src/api/muscleApi";
 import { fetchWorkoutLogsOnOrAfterDate, FullAttachedWorkoutLog } from "@/src/api/workoutLogApi";
 import { Button, ClosableModal, ModalPicker, Screen } from "@/src/components";
-import { RpeTableModal } from "@/src/components/RPEChart";
+import { RpeTableModal } from "@/src/screens/RPEChart";
 import { colors, spacing, typography } from "@/src/theme";
 import { ExerciseRow, ISODate, MUSCLE_GROUPS, MuscleGroup, MuscleGroupRow, UUID } from "@/src/types";
 import { requireGetUser, toISODate } from "@/src/utils";

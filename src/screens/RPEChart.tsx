@@ -4,11 +4,11 @@ import { BarChart, LineChart } from "react-native-gifted-charts";
 import { colors, spacing, typography } from "../theme";
 import { RPE, RPES, WEIGHT_UNITS, WeightUnit } from "../types";
 import { changeWeightUnit, requireGetUser } from "../utils";
-import { Button } from "./Button";
-import { ClosableModal, ClosableModalProps } from "./ClosableModal";
-import { ModalPicker } from "./ModalPicker";
-import { NumberField } from "./NumberField";
-import { Selection } from "./Selection";
+import { ClosableModal, ClosableModalProps } from "@/src/components/ClosableModal";
+import { ModalPicker } from "@/src/components/ModalPicker";
+import { NumberField } from "@/src/components/NumberField";
+import { Selection } from "@/src/components/Selection";
+import { Feather } from "@expo/vector-icons";
 
 export const RPE_TABLE_REPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 const MAX_ALLOWED_REPS = Math.max(...RPE_TABLE_REPS);
@@ -842,13 +842,7 @@ export function RpeTableModal(props: Omit<ClosableModalProps, "children">) {
 
   return (
     <ClosableModal {...props}>
-      <Button
-        title={"\u00D7"}
-        variant="secondary"
-        style={{ alignSelf: "flex-end", padding: 2, borderWidth: 0 }}
-        textProps={{ style: { ...typography.body } }}
-        onPress={props.onRequestClose}
-      />
+      <Feather name="x" onPress={props.onRequestClose} style={{ alignSelf: "flex-end", padding: 2, borderWidth: 0 }} size={22}/>
       <RpeTable
         mode={mode}
         onModeChange={setMode}

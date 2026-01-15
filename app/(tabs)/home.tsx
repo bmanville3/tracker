@@ -1,6 +1,6 @@
 import { Button, Screen } from "@/src/components";
-import { RpeTableModal } from "@/src/components/RPEChart";
-import { ExerciseModal } from "@/src/screens/ExerciseModal";
+import { RpeTableModal } from "@/src/screens/RPEChart";
+import { ExerciseModal } from "@/src/screens/exercise/ExerciseModal";
 import { useState } from "react";
 
 export default function HomeScreen() {
