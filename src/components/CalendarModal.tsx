@@ -21,6 +21,7 @@ type CalendarModalProps = {
   /** Optional: initial month to show if no selectedDate */
   initialMonth?: ISODate;
   title?: string;
+  doNotCloseOnSelect?: boolean;
 };
 
 const TOTAL_CELLS = 42;
@@ -50,6 +51,7 @@ export function CalendarModal(props: CalendarModalProps) {
     onSelectDate,
     initialMonth,
     title = "Select date",
+    doNotCloseOnSelect = false,
   } = props;
 
   // Determine which month to show when we (re)open
@@ -143,7 +145,9 @@ export function CalendarModal(props: CalendarModalProps) {
   const handleSave = () => {
     if (!pendingDate) return;
     onSelectDate(pendingDate);
-    onRequestClose();
+    if (!doNotCloseOnSelect) {
+      onRequestClose();
+    }
   };
 
   return (

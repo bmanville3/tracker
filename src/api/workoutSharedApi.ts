@@ -7,6 +7,7 @@ import {
   ProgramRow,
   TEMPLATE_PERFORMANCE_TYPES,
   TemplatePerformanceType,
+  UUID,
   WorkoutExerciseLogRow,
   WorkoutExerciseSetLogRow,
   WorkoutExerciseSetTemplateRow,
@@ -78,13 +79,13 @@ export type WorkoutSetTableName<M extends WorkoutEditorMode> = M extends "log"
 export type EditablePerformanceType<M extends WorkoutEditorMode> =
   ModeTypes<M>["SetRow"]["performance_type"];
 
-export function isFullLogWorkout(
+export function isFullDetachedLogWorkout(
   fw: FullDetachedWorkoutForMode<WorkoutEditorMode>,
 ): fw is FullDetachedWorkoutForMode<"log"> {
   return isLogWorkout(fw.workout);
 }
 
-export function isFullTemplateWorkout(
+export function isFullDetachedTemplateWorkout(
   fw: FullDetachedWorkoutForMode<WorkoutEditorMode>,
 ): fw is FullDetachedWorkoutForMode<"template"> {
   return isTemplateWorkout(fw.workout);
@@ -247,4 +248,32 @@ export function workoutHasProgram(
   | EditableWorkout<"template">
   | (EditableWorkout<"log"> & CompleteProgram) {
   return w.program_row !== null;
+}
+
+export type FullAttachedWorkout<M extends WorkoutEditorMode> = FullDetachedWorkoutForMode<M> & {
+  workoutId: UUID;
+};
+
+export function isFullAttachedLogWorkout(
+  fw: FullAttachedWorkout<WorkoutEditorMode>,
+): fw is FullAttachedWorkout<"log"> {
+  return isLogWorkout(fw.workout);
+}
+
+export function isFullAttachedLogWorkouts(
+  fw: FullAttachedWorkout<WorkoutEditorMode>[],
+): fw is FullAttachedWorkout<"log">[] {
+  if (fw.length === 0) {
+    return true;
+  }
+  return isLogWorkout(fw[0].workout);
+}
+
+export function isFullAttachedTemplateWorkouts(
+  fw: FullAttachedWorkout<WorkoutEditorMode>[],
+): fw is FullAttachedWorkout<"template">[] {
+  if (fw.length === 0) {
+    return true;
+  }
+  return isTemplateWorkout(fw[0].workout);
 }

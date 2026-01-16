@@ -17,20 +17,18 @@ import {
   EditableExercise,
   EditableSet,
   EditableWorkout,
+  FullAttachedWorkout,
   FullDetachedWorkoutForMode,
 } from "./workoutSharedApi";
 
-export type FullAttachedWorkoutLog = FullDetachedWorkoutForMode<"log"> & {
-  logId: UUID;
-};
 const TTL_MS = 15 * MINUTE_MS;
 const WORKOUT_LOG_CACHE =
-  CACHE_FACTORY.getOrCreateSwrKeyedCache<FullAttachedWorkoutLog>(
+  CACHE_FACTORY.getOrCreateSwrKeyedCache<FullAttachedWorkout<'log'>>(
     "workoutLogCache",
     TTL_MS,
   );
 const WORKOUT_LOG_QUERY_CACHE = CACHE_FACTORY.getOrCreateSwrKeyedCache<
-  WorkoutLogRow[]
+  UUID[]
 >("workoutQueryCache", TTL_MS);
 
 export function databaseRowToWorkoutLogRow(
@@ -240,11 +238,11 @@ export async function upsertWorkoutLog(ctx: {
       } else {
         WORKOUT_LOG_CACHE.set(workoutLogId, {
           ...payload,
-          logId: workoutLogId,
+          workoutId: workoutLogId,
         });
       }
     } else if (newId !== null) {
-      WORKOUT_LOG_CACHE.set(newId, { ...payload, logId: newId });
+      WORKOUT_LOG_CACHE.set(newId, { ...payload, workoutId: newId });
     } else {
       showAlert("runAll() was successful but no id was returned");
       WORKOUT_LOG_CACHE.clearAll();
@@ -270,7 +268,7 @@ export async function deleteWorkoutLog(workoutId: UUID): Promise<void> {
 
 export async function fullAttachedWorkoutLogFromWorkoutLogId(
   workoutId: UUID,
-): Promise<FullAttachedWorkoutLog> {
+): Promise<FullAttachedWorkout<'log'>> {
   return WORKOUT_LOG_CACHE.fetch(workoutId, async () => {
     const { data, error } = await supabase
       .from("workout_log")
@@ -285,7 +283,7 @@ export async function fullAttachedWorkoutLogFromWorkoutLogId(
 
 export async function fullAttachedWorkoutLogFromWorkoutLogRowCachless(
   workoutLogRow: WorkoutLogRow,
-): Promise<FullAttachedWorkoutLog> {
+): Promise<FullAttachedWorkout<'log'>> {
   // get the associated program if present
   let programRow: ProgramRow | null = null;
   if (workoutLogRow.program_id) {
@@ -402,32 +400,28 @@ export async function fullAttachedWorkoutLogFromWorkoutLogRowCachless(
     workout: editableWorkout,
     exercises: editableExercises,
     sets: editableSets,
-    logId: workoutLogRow.id,
+    workoutId: workoutLogRow.id,
   };
 }
 
 export async function fetchLastNWorkoutLogs(
   n: number,
-): Promise<FullAttachedWorkoutLog[]> {
+): Promise<FullAttachedWorkout<'log'>[]> {
   const key = pageKey("fetchLastNLogs", { n: n });
-  const logs: WorkoutLogRow[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
+  const logIds: UUID[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
     key,
     async () => {
       const { data, error } = await supabase
         .from("workout_log")
-        .select("*")
+        .select("id")
         .order("completed_on", { ascending: false })
         .limit(n);
       if (error) throw error;
-      return databaseRowsToWorkoutLogRows(data);
+      return data.map(d => d.id);
     },
   );
   const fullWorkouts = await Promise.all(
-    logs.map((log) =>
-      WORKOUT_LOG_CACHE.fetch(log.id, () =>
-        fullAttachedWorkoutLogFromWorkoutLogRowCachless(log),
-      ),
-    ),
+    logIds.map((id) => fullAttachedWorkoutLogFromWorkoutLogId(id)),
   );
   return fullWorkouts
     .sort((a, b) => a.workout.name.localeCompare(b.workout.name))
@@ -438,50 +432,67 @@ export async function fetchLastNWorkoutLogs(
 
 export async function fetchWorkoutLogsOnDate(
   date: ISODate,
-): Promise<FullAttachedWorkoutLog[]> {
+): Promise<FullAttachedWorkout<'log'>[]> {
   const key = pageKey("fetchWorkoutLogOnDate", { date: date });
-  const logs: WorkoutLogRow[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
+  const logIds: UUID[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
     key,
     async () => {
       const { data, error } = await supabase
         .from("workout_log")
-        .select("*")
+        .select("id")
         .eq("completed_on", date);
       if (error) throw error;
-      return databaseRowsToWorkoutLogRows(data);
+      return data.map(d => d.id);
     },
   );
   const fullWorkouts = await Promise.all(
-    logs.map((log) =>
-      WORKOUT_LOG_CACHE.fetch(log.id, () =>
-        fullAttachedWorkoutLogFromWorkoutLogRowCachless(log),
-      ),
-    ),
+    logIds.map((id) => fullAttachedWorkoutLogFromWorkoutLogId(id)),
   );
   return fullWorkouts;
 }
 
 export async function fetchWorkoutLogsOnOrAfterDate(
   date: ISODate,
-): Promise<FullAttachedWorkoutLog[]> {
+): Promise<FullAttachedWorkout<'log'>[]> {
   const key = pageKey("fetchWorkoutLogsOnOrAfterDate", { date: date });
-  const logs: WorkoutLogRow[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
+  const logIds: UUID[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
     key,
     async () => {
       const { data, error } = await supabase
         .from("workout_log")
-        .select("*")
+        .select("id")
         .gte("completed_on", date);
       if (error) throw error;
-      return databaseRowsToWorkoutLogRows(data);
+      return data.map(d => d.id);
     },
   );
   const fullWorkouts = await Promise.all(
-    logs.map((log) =>
-      WORKOUT_LOG_CACHE.fetch(log.id, () =>
-        fullAttachedWorkoutLogFromWorkoutLogRowCachless(log),
-      ),
-    ),
+    logIds.map((id) => fullAttachedWorkoutLogFromWorkoutLogId(id)),
+  );
+  return fullWorkouts;
+}
+
+export async function fetchWorkoutLogsInRange(
+  date1Inclusive: ISODate, date2Inclusive: ISODate
+): Promise<FullAttachedWorkout<'log'>[]> {
+  if (date1Inclusive > date2Inclusive) {
+    return [];
+  }
+  const key = pageKey("fetchWorkoutLogsInRange", { date1Inclusive, date2Inclusive });
+  const logIds: UUID[] = await WORKOUT_LOG_QUERY_CACHE.fetch(
+    key,
+    async () => {
+      const { data, error } = await supabase
+        .from("workout_log")
+        .select("id")
+        .gte("completed_on", date1Inclusive)
+        .lte("completed_on", date2Inclusive);
+      if (error) throw error;
+      return data.map(d => d.id);
+    },
+  );
+  const fullWorkouts = await Promise.all(
+    logIds.map((id) => fullAttachedWorkoutLogFromWorkoutLogId(id)),
   );
   return fullWorkouts;
 }

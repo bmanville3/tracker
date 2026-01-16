@@ -8,8 +8,8 @@ import {
   EditableWorkout,
   editableWorkoutEqual,
   FullDetachedWorkoutForMode,
-  isFullLogWorkout,
-  isFullTemplateWorkout,
+  isFullDetachedLogWorkout,
+  isFullDetachedTemplateWorkout,
   isLogSet,
   isLogWorkout,
   isTemplateSet,
@@ -1102,9 +1102,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       let savedExercises = exercises;
       let savedSets = sets;
 
-      if (isFullTemplateWorkout(payload)) {
+      if (isFullDetachedTemplateWorkout(payload)) {
         success = await upsertTemplateWorkout(payload, updateWorkoutId);
-      } else if (isFullLogWorkout(payload)) {
+      } else if (isFullDetachedLogWorkout(payload)) {
         const user = await requireGetUser();
         if (!user) return;
 
