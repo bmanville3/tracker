@@ -326,7 +326,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
 
   const renderWorkoutFooter = () => {
     return (
-      <View style={{ marginBottom: 16 }}>
+      <View>
         <Text style={typography.label}>Notes</Text>
         <TextField
           multiline
@@ -352,6 +352,31 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           }}
           editable={!isLoading && allowEditing}
         />
+        <View
+          style={{
+            flexDirection: "row",
+            paddingHorizontal: 16,
+            paddingBottom: 16,
+            paddingTop: 8,
+            gap: 8,
+            marginTop: spacing.md,
+          }}
+        >
+          <Button
+            title={allowEditing ? "Cancel ": "Exit"}
+            onPress={requestClose}
+            variant={allowEditing ? "secondary" : "primary"}
+            style={{ flex: 1}}
+          />
+          {allowEditing && (
+            <Button
+              title={`${updateWorkoutId !== null ? "Update" : "Create"} ${isTemplateWorkout(workout) ? "Template" : "Log"}`}
+              onPress={handleSave}
+              disabled={!isSavable || isLoading || !allowEditing}
+              style={{ flex: 1}}
+            />
+          )}
+        </View>
       </View>
     );
   };
@@ -737,6 +762,18 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             )}
           </View>
         )}
+        {allowEditing && <Button
+          title={"Change Exercise"}
+          onPress={() => {
+            setExercisePickerFunction(() => (newExercise: ExerciseRow) => {
+              handleUpdateExercise(exerciseIdx, 'exercise', newExercise);
+              clearAdvancedExercise();
+            })
+            setOpenExercisePicker(true);
+          }}
+          variant="secondary"
+          disabled={isLoading || !allowEditing}
+        />}
         <View>
           <Text style={typography.body}>Notes:</Text>
           <TextField
@@ -1003,6 +1040,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                         style: {
                           ...typography.hint,
                           color: colors.textOnPrimary,
+                          fontWeight: '700'
                         },
                       }}
                       disabled={!allowEditing}
@@ -1104,31 +1142,6 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     }
   };
 
-  {
-    /* Picker for adding new exercses */
-  }
-  if (openExercisePicker)
-    return (
-      <ExerciseModal
-        allowSelectExercises={true}
-        allowCreateExercises={true}
-        visible={openExercisePicker}
-        onRequestClose={(exercise: ExerciseRow | null) => {
-          setOpenExercisePicker(false);
-          if (exercise === null) {
-            return;
-          }
-          if (exercisePickerFunction === null) {
-            console.error(
-              "Requested close on exercise modal but no picker function selected",
-            );
-            return;
-          }
-          exercisePickerFunction(exercise);
-        }}
-      />
-    );
-
   if (!isActive) {
     return null;
   }
@@ -1147,35 +1160,26 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       {renderAssociatedProgram()}
       {renderExercisesSection()}
       {renderWorkoutFooter()}
-
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: 16,
-          paddingBottom: 16,
-          paddingTop: 8,
-          gap: 8,
-        }}
-      >
-        {allowEditing && (
-          <View style={{ flex: 1 }}>
-            <Button
-              title={`${updateWorkoutId !== null ? "Update" : "Create"} ${isTemplateWorkout(workout) ? "Template" : "Log"}`}
-              onPress={handleSave}
-              disabled={!isSavable || isLoading || !allowEditing}
-            />
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Exit"
-            onPress={requestClose}
-            variant={allowEditing ? "secondary" : "primary"}
-          />
-        </View>
-      </View>
       {renderAdvancedSet()}
-      {renderAdvancedExercise()}
+      {!openExercisePicker && renderAdvancedExercise()}
+      <ExerciseModal
+        allowSelectExercises={true}
+        allowCreateExercises={true}
+        visible={openExercisePicker}
+        onRequestClose={(exercise: ExerciseRow | null) => {
+          setOpenExercisePicker(false);
+          if (exercise === null) {
+            return;
+          }
+          if (exercisePickerFunction === null) {
+            console.error(
+              "Requested close on exercise modal but no picker function selected",
+            );
+            return;
+          }
+          exercisePickerFunction(exercise);
+        }}
+      />
     </Screen>
   );
 }

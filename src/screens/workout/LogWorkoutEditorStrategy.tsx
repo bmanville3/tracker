@@ -478,37 +478,25 @@ function renderWeightSet(ctx: SetRenderProps<"log">): React.JSX.Element | null {
   const showReps = showField(allowEditing, set.reps);
   const showRpe = showField(allowEditing, set.rpe);
 
-  const setNumber = <Text style={typography.hint}>{ctx.setIndex + 1}.</Text>;
-
-  if (
-    !(showReps || showWeight || showRpe) &&
-    set.rest_seconds_before === null &&
-    set.duration === null
-  ) {
-    return setNumber;
-  }
-
   return (
     <View>
-      {
-        <InlineRow>
-          {setNumber}
-          {showWeight && weightChangerForSet(ctx)}
-          {showWeight && weightUnitPickerForSet(ctx)}
-          {showWeight && showReps && (
-            <Text style={typography.body}>&times;</Text>
-          )}
-          {showReps && repsChanger(ctx)}
-          {(showReps || showRpe) && (
-            <Text style={typography.body}>
-              {showReps ? "Reps" : ""}
-              {showRpe && showReps ? " @ " : ""}
-              {showRpe ? "RPE" : ""}
-            </Text>
-          )}
-          {showRpe && rpePickerForSet(ctx)}
-        </InlineRow>
-      }
+      <InlineRow>
+        <Text style={typography.hint}>{ctx.setIndex + 1}.{set.set_type ? ` ${capitalizeFirstLetter(set.set_type)}` : ''}</Text>
+        {showWeight && weightChangerForSet(ctx)}
+        {showWeight && weightUnitPickerForSet(ctx)}
+        {showWeight && showReps && (
+          <Text style={typography.body}>&times;</Text>
+        )}
+        {showReps && repsChanger(ctx)}
+        {(showReps || showRpe) && (
+          <Text style={typography.body}>
+            {showReps ? "Reps" : ""}
+            {showRpe && showReps ? " @ " : ""}
+            {showRpe ? "RPE" : ""}
+          </Text>
+        )}
+        {showRpe && rpePickerForSet(ctx)}
+      </InlineRow>
       {(set.rest_seconds_before !== null || set.duration !== null) && (
         <Text style={{ ...typography.hint, marginTop: spacing.sm }}>
           {set.rest_seconds_before !== null && (

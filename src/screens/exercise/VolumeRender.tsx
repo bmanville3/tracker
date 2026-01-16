@@ -1,11 +1,13 @@
-import { ActivityIndicator, Text, View } from "react-native";
-import { colors, spacing, typography } from "../../theme";
-import { ExerciseMuscleRow, ExerciseRow, MUSCLE_GROUPS, MuscleGroup, MuscleGroupRow } from "../../types";
 import { useEffect, useRef, useState } from "react";
-import { Button, ModalPicker, TextField } from "../../components";
-import { anyErrorToString, requireGetUser, showAlert } from "../../utils";
+import { ActivityIndicator, Text, View } from "react-native";
 import { addExerciseMuscleVolume, deleteExerciseMuscleVolume, fetchExerciseMuscleVolumes, searchExercises, updateExerciseMuscleVolume } from "../../api/exerciseApi";
 import { fetchMuscleGroups } from "../../api/muscleApi";
+import { Button, ModalPicker, TextField } from "../../components";
+import { colors, spacing, typography } from "../../theme";
+import { ExerciseMuscleRow, ExerciseRow, MUSCLE_GROUPS, MuscleGroup, MuscleGroupRow } from "../../types";
+import { anyErrorToString, requireGetUser, showAlert } from "../../utils";
+
+export const ALLOWED_VOLUMES = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] as const;
 
 type VolumeEntry = {
   existing_db_row: ExerciseMuscleRow | null;
@@ -299,10 +301,7 @@ export function VolumeRender(props: VolumeRenderProps) {
                           value: "Delete" | "Default" | "Remove from View" | number;
                           description?: string;
                         }[] = [
-                          ...[
-                            0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                            1.0,
-                          ].map((n) => {
+                          ...ALLOWED_VOLUMES.map((n) => {
                             return { label: n.toFixed(1), value: n };
                           }),
                         ];
@@ -390,18 +389,22 @@ export function VolumeRender(props: VolumeRenderProps) {
               })}
           </View>
 
-          {allowEditing && <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
+          {allowEditing && <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
             {MUSCLE_GROUPS.length != muscleGroupsToRender.length && (
               <ModalPicker
                 title="Add Muscle Group Volume"
-                options={MUSCLE_GROUPS.filter(
-                  (mg) => !muscleGroupsToRender.includes(mg),
-                ).map((mg) => {
-                  return {
-                    label: muscleGroups.get(mg)?.display_name ?? mg,
-                    value: mg,
-                  };
-                }).toSorted((a, b) => a.value.localeCompare(b.value))}
+                options={(() => {
+                  const muscleGroupsToAdd = MUSCLE_GROUPS.filter(
+                    (mg) => !muscleGroupsToRender.includes(mg),
+                  ).map((mg) => {
+                    return {
+                      label: muscleGroups.get(mg)?.display_name ?? mg,
+                      value: mg,
+                    };
+                  })
+                  muscleGroupsToAdd.sort((a, b) => a.value.localeCompare(b.value));
+                  return muscleGroupsToAdd;
+                })()}
                 value={null}
                 placeholder="Add Muscle Group"
                 onChange={(value) =>
@@ -409,7 +412,7 @@ export function VolumeRender(props: VolumeRenderProps) {
                 }
                 pressableProps={{
                   style: {
-                    alignSelf: "flex-start",
+                    alignItems: "center",
                   },
                 }}
                 textProps={{ style: {...typography.body, fontWeight: '700'}}}
@@ -456,7 +459,11 @@ export function VolumeRender(props: VolumeRenderProps) {
               placeholder="Search Exercises..."
             />
             {copyFromOtherOptions.map(exRow => {
+              if (exRow.id === exercise.id) {
+                return null;
+              }
               return <Button
+                key={exRow.id}
                 title={`Copy from ${exRow.name}`}
                 onPress={() => {
                   setVolumeError(null);

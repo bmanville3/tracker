@@ -24,10 +24,12 @@ export const typography = {
     marginTop: 12,
   },
   body: {
+    fontWeight: "400" as const,
     fontSize: 14,
     color: colors.textPrimary,
   },
   hint: {
+    fontWeight: "400" as const,
     fontSize: 12,
     color: colors.textSecondary,
   },

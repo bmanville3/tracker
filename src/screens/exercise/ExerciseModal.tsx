@@ -25,6 +25,7 @@ import {
   requireGetUser,
   setsEqual,
   showAlert,
+  stringifyList,
 } from "@/src/utils";
 import { VolumeRender } from "./VolumeRender";
 
@@ -509,7 +510,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
   };
 
   const renderVolumeEditor = () => {
-    if (!selectedExerciseForVolume) {
+    if (selectedExerciseForVolume === null) {
       return (
         <Text style={{ ...typography.body, opacity: 0.6 }}>
           Select an exercise to configure muscle volumes.
@@ -519,9 +520,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
 
     return <VolumeRender
       exercise={selectedExerciseForVolume}
-      onRequestClose={() => {
-        setSelectedExerciseForVolume(null);
-      }}
+      onRequestClose={() => setSelectedExerciseForVolume(null)}
       allowEditing={true}
     />
   };
@@ -529,7 +528,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
   const renderSelectTags = () => {
     return (
       <View
-        style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}
+        style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", rowGap: spacing.xs, gap: spacing.xs}}
       >
         {EXERCISE_AND_MUSCLE_TAGS.map((tag, idx) => {
           let onPress;
@@ -555,9 +554,8 @@ export function ExerciseModal(props: ExerciseModalProps) {
                 paddingVertical: 2,
                 borderRadius: 999,
                 borderWidth: 1,
-                borderColor: borderColor,
-                backgroundColor: backgroundColor,
-                marginRight: 4,
+                borderColor,
+                backgroundColor,
               }}
             >
               <Pressable onPress={onPress}>
@@ -731,6 +729,13 @@ export function ExerciseModal(props: ExerciseModalProps) {
     );
   };
 
+  const disabledActions = [
+    !allowEditExercises && "Editing",
+    !allowDeleteExercises && "Deleting",
+    !allowCreateExercises && "Creating",
+  ].filter(Boolean) as string[];
+
+
   return (
     <ClosableModal
       visible={visible}
@@ -749,6 +754,11 @@ export function ExerciseModal(props: ExerciseModalProps) {
           <Text style={{ fontSize: 18 }}>&#x2715;</Text>
         </Pressable>
       </View>
+      {disabledActions.length > 0 && (
+        <Text style={typography.body}>
+          {stringifyList(disabledActions)} exercises {disabledActions.length === 1 ? 'is' : 'are'} disabled
+        </Text>
+      )}
 
       {/* Search */}
       {mode === "Search" && renderSearchMode()}

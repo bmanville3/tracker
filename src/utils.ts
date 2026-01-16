@@ -249,3 +249,9 @@ export function anyErrorToString(e: any, fallback: string): string {
 export type OmitNever<T, K extends keyof T> = Omit<T, K> & {
   [P in K]?: never;
 };
+
+export function stringifyList(items: string[]): string {
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
