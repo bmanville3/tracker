@@ -481,12 +481,13 @@ function renderWeightSet(ctx: SetRenderProps<"log">): React.JSX.Element | null {
   return (
     <View>
       <InlineRow>
-        <Text style={typography.hint}>{ctx.setIndex + 1}.{set.set_type ? ` ${capitalizeFirstLetter(set.set_type)}` : ''}</Text>
+        <Text style={typography.hint}>
+          {ctx.setIndex + 1}.
+          {set.set_type ? ` ${capitalizeFirstLetter(set.set_type)}` : ""}
+        </Text>
         {showWeight && weightChangerForSet(ctx)}
         {showWeight && weightUnitPickerForSet(ctx)}
-        {showWeight && showReps && (
-          <Text style={typography.body}>&times;</Text>
-        )}
+        {showWeight && showReps && <Text style={typography.body}>&times;</Text>}
         {showReps && repsChanger(ctx)}
         {(showReps || showRpe) && (
           <Text style={typography.body}>

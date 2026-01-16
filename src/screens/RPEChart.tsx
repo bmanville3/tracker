@@ -4,7 +4,10 @@ import { BarChart, LineChart } from "react-native-gifted-charts";
 import { colors, spacing, typography } from "../theme";
 import { RPE, RPES, WEIGHT_UNITS, WeightUnit } from "../types";
 import { changeWeightUnit, requireGetUser } from "../utils";
-import { ClosableModal, ClosableModalProps } from "@/src/components/ClosableModal";
+import {
+  ClosableModal,
+  ClosableModalProps,
+} from "@/src/components/ClosableModal";
 import { ModalPicker } from "@/src/components/ModalPicker";
 import { NumberField } from "@/src/components/NumberField";
 import { Selection } from "@/src/components/Selection";
@@ -425,15 +428,23 @@ export function RpeTable({
       const weight = 1 / percent;
       return { value: weight };
     });
-  
-  const data = ordered.map(v => mapToPoints(v.fn));
+
+  const data = ordered.map((v) => mapToPoints(v.fn));
   let avgs = Array.from({ length: RPE_TABLE_REPS.length }, () => 0);
   let stds = Array.from({ length: RPE_TABLE_REPS.length }, () => 0);
-  data.forEach(calcType => calcType.forEach((rpeVal, i) => avgs[i] += rpeVal.value));
-  avgs = avgs.map(a => a / data.length);
-  data.forEach(calcType => calcType.forEach((rpeVal, i) => stds[i] += Math.pow(rpeVal.value - avgs[i], 2)));
-  stds = stds.map(s => Math.sqrt(s / (data.length - 1)));
-  data.forEach(calcType => calcType.forEach((v, i) => v.value = (v.value - avgs[i]) / stds[i]))
+  data.forEach((calcType) =>
+    calcType.forEach((rpeVal, i) => (avgs[i] += rpeVal.value)),
+  );
+  avgs = avgs.map((a) => a / data.length);
+  data.forEach((calcType) =>
+    calcType.forEach(
+      (rpeVal, i) => (stds[i] += Math.pow(rpeVal.value - avgs[i], 2)),
+    ),
+  );
+  stds = stds.map((s) => Math.sqrt(s / (data.length - 1)));
+  data.forEach((calcType) =>
+    calcType.forEach((v, i) => (v.value = (v.value - avgs[i]) / stds[i])),
+  );
 
   return (
     <View>
@@ -733,8 +744,8 @@ export function RpeTable({
 
           {/* Legend */}
           <Text style={typography.hint}>
-            Each line shows e1RM vs reps at RPE 10. Z-score scaling has been applied. The currently selected
-            formula ({mode}) is highlighted.
+            Each line shows e1RM vs reps at RPE 10. Z-score scaling has been
+            applied. The currently selected formula ({mode}) is highlighted.
           </Text>
           <View
             style={{
@@ -842,7 +853,12 @@ export function RpeTableModal(props: Omit<ClosableModalProps, "children">) {
 
   return (
     <ClosableModal {...props}>
-      <Feather name="x" onPress={props.onRequestClose} style={{ alignSelf: "flex-end", padding: 2, borderWidth: 0 }} size={22}/>
+      <Feather
+        name="x"
+        onPress={props.onRequestClose}
+        style={{ alignSelf: "flex-end", padding: 2, borderWidth: 0 }}
+        size={22}
+      />
       <RpeTable
         mode={mode}
         onModeChange={setMode}

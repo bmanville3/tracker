@@ -1,13 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
-import { addExerciseMuscleVolume, deleteExerciseMuscleVolume, fetchExerciseMuscleVolumes, searchExercises, updateExerciseMuscleVolume } from "../../api/exerciseApi";
+import {
+  addExerciseMuscleVolume,
+  deleteExerciseMuscleVolume,
+  fetchExerciseMuscleVolumes,
+  searchExercises,
+  updateExerciseMuscleVolume,
+} from "../../api/exerciseApi";
 import { fetchMuscleGroups } from "../../api/muscleApi";
 import { Button, ModalPicker, TextField } from "../../components";
 import { colors, spacing, typography } from "../../theme";
-import { ExerciseMuscleRow, ExerciseRow, MUSCLE_GROUPS, MuscleGroup, MuscleGroupRow } from "../../types";
+import {
+  ExerciseMuscleRow,
+  ExerciseRow,
+  MUSCLE_GROUPS,
+  MuscleGroup,
+  MuscleGroupRow,
+} from "../../types";
 import { anyErrorToString, requireGetUser, showAlert } from "../../utils";
 
-export const ALLOWED_VOLUMES = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] as const;
+export const ALLOWED_VOLUMES = [
+  0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
+] as const;
 
 type VolumeEntry = {
   existing_db_row: ExerciseMuscleRow | null;
@@ -55,22 +69,28 @@ export type VolumeRenderProps = {
   exercise: ExerciseRow;
   onRequestClose: () => void;
   allowEditing?: boolean;
-}
+};
 
 export function VolumeRender(props: VolumeRenderProps) {
   const { exercise, onRequestClose, allowEditing = true } = props;
   const [volumeError, setVolumeError] = useState<string | null>(null);
   const [loadingVolumes, setLoadingVolumes] = useState(false);
-  const [volumeByMuscle, setVolumeByMuscle] = useState<VolumeByMuscle | null>(null);
+  const [volumeByMuscle, setVolumeByMuscle] = useState<VolumeByMuscle | null>(
+    null,
+  );
   const [muscleGroupsToRender, setMuscleGroupsToRender] = useState<
     MuscleGroup[]
   >([]);
   const initialVolumeValuesRef = useRef<VolumeByMuscle | null>(null);
-  const [muscleGroups, setMuscleGroups] = useState<Map<MuscleGroup, MuscleGroupRow>>(new Map());
+  const [muscleGroups, setMuscleGroups] = useState<
+    Map<MuscleGroup, MuscleGroupRow>
+  >(new Map());
 
   const [showCopyFromOther, setShowCopyFromOther] = useState<boolean>(false);
   const [copyFromOtherSearch, setCopyFromOtherSearch] = useState<string>("");
-  const [copyFromOtherOptions, setCopyFromOtherOptions] = useState<ExerciseRow[]>([]);
+  const [copyFromOtherOptions, setCopyFromOtherOptions] = useState<
+    ExerciseRow[]
+  >([]);
 
   const loadAll = async () => {
     setMuscleGroups(await fetchMuscleGroups());
@@ -79,7 +99,7 @@ export function VolumeRender(props: VolumeRenderProps) {
 
   useEffect(() => {
     void loadAll();
-  }, [])
+  }, []);
 
   const loadVolumesForExercise = async () => {
     setLoadingVolumes(true);
@@ -144,27 +164,23 @@ export function VolumeRender(props: VolumeRenderProps) {
       if (!user) return;
 
       if (
-        Object.values(volumeByMuscle).some(
-          (volumeRow) => {
-            if (
-              volumeRow.new_value !== null &&
-              (volumeRow.new_value < 0 || volumeRow.new_value > 1)
-            ) {
-              showAlert(
-                `Volume must be between 0 and 1. Got ${volumeRow.new_value}`,
-              );
-              return true;
-            }
-            return false;
-          },
-        )
+        Object.values(volumeByMuscle).some((volumeRow) => {
+          if (
+            volumeRow.new_value !== null &&
+            (volumeRow.new_value < 0 || volumeRow.new_value > 1)
+          ) {
+            showAlert(
+              `Volume must be between 0 and 1. Got ${volumeRow.new_value}`,
+            );
+            return true;
+          }
+          return false;
+        })
       ) {
         return;
       }
 
-      for (const [muscleId, volumeRow] of Object.entries(
-        volumeByMuscle,
-      )) {
+      for (const [muscleId, volumeRow] of Object.entries(volumeByMuscle)) {
         // nothing to update
         if (volumeRow.new_value === null && !volumeRow.remove_existing_db_row) {
           continue;
@@ -298,7 +314,11 @@ export function VolumeRender(props: VolumeRenderProps) {
                       options={(() => {
                         const allOptions: {
                           label: string;
-                          value: "Delete" | "Default" | "Remove from View" | number;
+                          value:
+                            | "Delete"
+                            | "Default"
+                            | "Remove from View"
+                            | number;
                           description?: string;
                         }[] = [
                           ...ALLOWED_VOLUMES.map((n) => {
@@ -330,8 +350,9 @@ export function VolumeRender(props: VolumeRenderProps) {
                           allOptions.push({
                             label: "Remove from View",
                             value: "Remove from View",
-                            description: "Removes from list of muscle groups and resets to default"
-                          })
+                            description:
+                              "Removes from list of muscle groups and resets to default",
+                          });
                         }
                         return allOptions;
                       })()}
@@ -350,7 +371,9 @@ export function VolumeRender(props: VolumeRenderProps) {
                         } else if (value === "Default") {
                           updateVolumeField(name, null, false);
                         } else if (value === "Remove from View") {
-                          setMuscleGroupsToRender((prev) => prev.filter(mg => mg !== name));
+                          setMuscleGroupsToRender((prev) =>
+                            prev.filter((mg) => mg !== name),
+                          );
                           updateVolumeField(name, null, false);
                         } else if (typeof value === "number") {
                           if (
@@ -389,126 +412,153 @@ export function VolumeRender(props: VolumeRenderProps) {
               })}
           </View>
 
-          {allowEditing && <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
-            {MUSCLE_GROUPS.length != muscleGroupsToRender.length && (
-              <ModalPicker
-                title="Add Muscle Group Volume"
-                options={(() => {
-                  const muscleGroupsToAdd = MUSCLE_GROUPS.filter(
-                    (mg) => !muscleGroupsToRender.includes(mg),
-                  ).map((mg) => {
-                    return {
-                      label: muscleGroups.get(mg)?.display_name ?? mg,
-                      value: mg,
-                    };
-                  })
-                  muscleGroupsToAdd.sort((a, b) => a.value.localeCompare(b.value));
-                  return muscleGroupsToAdd;
-                })()}
-                value={null}
-                placeholder="Add Muscle Group"
-                onChange={(value) =>
-                  setMuscleGroupsToRender([...muscleGroupsToRender, value])
-                }
-                pressableProps={{
-                  style: {
-                    alignItems: "center",
-                  },
-                }}
-                textProps={{ style: {...typography.body, fontWeight: '700'}}}
-              />
-            )}
-            <Button
-              title={"Import from Existing"}
-              onPress={() => setShowCopyFromOther((prev) => !prev)}
-              variant="secondary"
-              style={{ padding: spacing.sm, margin: 0, backgroundColor: showCopyFromOther ? colors.fadedPrimary : undefined }}
-              textProps={{ style: {...typography.body, fontWeight: '700'}}}
-            />
-            <Button
-              title={"Revert All"}
-              onPress={() => {
-                setVolumeByMuscle(initialVolumeValuesRef.current);
-                if (initialVolumeValuesRef.current !== null) {
-                  const originalGroups = MUSCLE_GROUPS.filter(
-                    (mg) => initialVolumeValuesRef.current![mg].existing_db_row !== null
-                  );
-                  setMuscleGroupsToRender(originalGroups);
-                } else {
-                  setMuscleGroupsToRender([]);
-                }
-                setVolumeError(null);
-              }}
-              variant="secondary"
-              style={{ padding: spacing.sm, margin: 0 }}
-              textProps={{ style: {...typography.body, fontWeight: '700'}}}
-              disabled={volumeByMuscleEqual(
-                initialVolumeValuesRef.current,
-                volumeByMuscle,
+          {allowEditing && (
+            <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
+              {MUSCLE_GROUPS.length != muscleGroupsToRender.length && (
+                <ModalPicker
+                  title="Add Muscle Group Volume"
+                  options={(() => {
+                    const muscleGroupsToAdd = MUSCLE_GROUPS.filter(
+                      (mg) => !muscleGroupsToRender.includes(mg),
+                    ).map((mg) => {
+                      return {
+                        label: muscleGroups.get(mg)?.display_name ?? mg,
+                        value: mg,
+                      };
+                    });
+                    muscleGroupsToAdd.sort((a, b) =>
+                      a.value.localeCompare(b.value),
+                    );
+                    return muscleGroupsToAdd;
+                  })()}
+                  value={null}
+                  placeholder="Add Muscle Group"
+                  onChange={(value) =>
+                    setMuscleGroupsToRender([...muscleGroupsToRender, value])
+                  }
+                  pressableProps={{
+                    style: {
+                      alignItems: "center",
+                    },
+                  }}
+                  textProps={{
+                    style: { ...typography.body, fontWeight: "700" },
+                  }}
+                />
               )}
-            />
-          </View>}
-
-          {allowEditing && showCopyFromOther && <View>
-            <TextField
-              value={copyFromOtherSearch}
-              onChangeText={(value) => {
-                setCopyFromOtherSearch(value);
-                (async () => setCopyFromOtherOptions(await searchExercises(value)))();
-              }}
-              placeholder="Search Exercises..."
-            />
-            {copyFromOtherOptions.map(exRow => {
-              if (exRow.id === exercise.id) {
-                return null;
-              }
-              return <Button
-                key={exRow.id}
-                title={`Copy from ${exRow.name}`}
-                onPress={() => {
-                  setVolumeError(null);
-                  setLoadingVolumes(true);
-
-                  (async () => {
-                    const user = await requireGetUser();
-                    if (!user) return;
-
-                    const source = await fetchExerciseMuscleVolumes(exRow.id, user.user_id);
-
-                    setVolumeByMuscle(prev => {
-                      if (!prev) return prev;
-
-                      const next: VolumeByMuscle = { ...prev };
-                      source.forEach((row, mg) => {
-                        next[mg] = {
-                          ...next[mg],
-                          new_value: row.volume_factor,
-                          remove_existing_db_row: false,
-                        };
-                      });
-                      return next;
-                    });
-
-                    setMuscleGroupsToRender(prev => {
-                      const set = new Set(prev);
-                      source.forEach((_row, mg) => set.add(mg));
-                      return Array.from(set);
-                    });
-
-                    setShowCopyFromOther(false);
-                    setCopyFromOtherSearch("");
-                    setCopyFromOtherOptions([]);
-                  })()
-                    .catch((e) =>
-                      setVolumeError(`Error copying volumes: ${anyErrorToString(e, "Unknown Error")}`),
-                    )
-                    .finally(() => setLoadingVolumes(false));
+              <Button
+                title={"Import from Existing"}
+                onPress={() => setShowCopyFromOther((prev) => !prev)}
+                variant="secondary"
+                style={{
+                  padding: spacing.sm,
+                  margin: 0,
+                  backgroundColor: showCopyFromOther
+                    ? colors.fadedPrimary
+                    : undefined,
                 }}
-
-                style={{ padding: spacing.sm, margin: 1, alignSelf: 'flex-start' }}
+                textProps={{ style: { ...typography.body, fontWeight: "700" } }}
               />
-            })}
-          </View>}
+              <Button
+                title={"Revert All"}
+                onPress={() => {
+                  setVolumeByMuscle(initialVolumeValuesRef.current);
+                  if (initialVolumeValuesRef.current !== null) {
+                    const originalGroups = MUSCLE_GROUPS.filter(
+                      (mg) =>
+                        initialVolumeValuesRef.current![mg].existing_db_row !==
+                        null,
+                    );
+                    setMuscleGroupsToRender(originalGroups);
+                  } else {
+                    setMuscleGroupsToRender([]);
+                  }
+                  setVolumeError(null);
+                }}
+                variant="secondary"
+                style={{ padding: spacing.sm, margin: 0 }}
+                textProps={{ style: { ...typography.body, fontWeight: "700" } }}
+                disabled={volumeByMuscleEqual(
+                  initialVolumeValuesRef.current,
+                  volumeByMuscle,
+                )}
+              />
+            </View>
+          )}
+
+          {allowEditing && showCopyFromOther && (
+            <View>
+              <TextField
+                value={copyFromOtherSearch}
+                onChangeText={(value) => {
+                  setCopyFromOtherSearch(value);
+                  (async () =>
+                    setCopyFromOtherOptions(await searchExercises(value)))();
+                }}
+                placeholder="Search Exercises..."
+              />
+              {copyFromOtherOptions.map((exRow) => {
+                if (exRow.id === exercise.id) {
+                  return null;
+                }
+                return (
+                  <Button
+                    key={exRow.id}
+                    title={`Copy from ${exRow.name}`}
+                    onPress={() => {
+                      setVolumeError(null);
+                      setLoadingVolumes(true);
+
+                      (async () => {
+                        const user = await requireGetUser();
+                        if (!user) return;
+
+                        const source = await fetchExerciseMuscleVolumes(
+                          exRow.id,
+                          user.user_id,
+                        );
+
+                        setVolumeByMuscle((prev) => {
+                          if (!prev) return prev;
+
+                          const next: VolumeByMuscle = { ...prev };
+                          source.forEach((row, mg) => {
+                            next[mg] = {
+                              ...next[mg],
+                              new_value: row.volume_factor,
+                              remove_existing_db_row: false,
+                            };
+                          });
+                          return next;
+                        });
+
+                        setMuscleGroupsToRender((prev) => {
+                          const set = new Set(prev);
+                          source.forEach((_row, mg) => set.add(mg));
+                          return Array.from(set);
+                        });
+
+                        setShowCopyFromOther(false);
+                        setCopyFromOtherSearch("");
+                        setCopyFromOtherOptions([]);
+                      })()
+                        .catch((e) =>
+                          setVolumeError(
+                            `Error copying volumes: ${anyErrorToString(e, "Unknown Error")}`,
+                          ),
+                        )
+                        .finally(() => setLoadingVolumes(false));
+                    }}
+                    style={{
+                      padding: spacing.sm,
+                      margin: 1,
+                      alignSelf: "flex-start",
+                    }}
+                  />
+                );
+              })}
+            </View>
+          )}
 
           {allowEditing && (
             <Button
@@ -533,4 +583,4 @@ export function VolumeRender(props: VolumeRenderProps) {
       )}
     </View>
   );
-};
+}

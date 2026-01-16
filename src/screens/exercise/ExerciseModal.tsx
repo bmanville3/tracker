@@ -7,12 +7,7 @@ import {
   searchExercises,
   updateExercise,
 } from "@/src/api/exerciseApi";
-import {
-  Button,
-  ClosableModal,
-  Selection,
-  TextField,
-} from "@/src/components";
+import { Button, ClosableModal, Selection, TextField } from "@/src/components";
 import { colors, spacing, typography } from "@/src/theme";
 import {
   EXERCISE_AND_MUSCLE_TAGS,
@@ -518,17 +513,25 @@ export function ExerciseModal(props: ExerciseModalProps) {
       );
     }
 
-    return <VolumeRender
-      exercise={selectedExerciseForVolume}
-      onRequestClose={() => setSelectedExerciseForVolume(null)}
-      allowEditing={true}
-    />
+    return (
+      <VolumeRender
+        exercise={selectedExerciseForVolume}
+        onRequestClose={() => setSelectedExerciseForVolume(null)}
+        allowEditing={true}
+      />
+    );
   };
 
   const renderSelectTags = () => {
     return (
       <View
-        style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", rowGap: spacing.xs, gap: spacing.xs}}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          flexWrap: "wrap",
+          rowGap: spacing.xs,
+          gap: spacing.xs,
+        }}
       >
         {EXERCISE_AND_MUSCLE_TAGS.map((tag, idx) => {
           let onPress;
@@ -735,7 +738,6 @@ export function ExerciseModal(props: ExerciseModalProps) {
     !allowCreateExercises && "Creating",
   ].filter(Boolean) as string[];
 
-
   return (
     <ClosableModal
       visible={visible}
@@ -756,7 +758,8 @@ export function ExerciseModal(props: ExerciseModalProps) {
       </View>
       {disabledActions.length > 0 && (
         <Text style={typography.body}>
-          {stringifyList(disabledActions)} exercises {disabledActions.length === 1 ? 'is' : 'are'} disabled
+          {stringifyList(disabledActions)} exercises{" "}
+          {disabledActions.length === 1 ? "is" : "are"} disabled
         </Text>
       )}
 
