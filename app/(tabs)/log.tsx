@@ -10,9 +10,8 @@ import {
 import {
   deleteWorkoutLog,
   fetchLastNWorkoutLogs,
-  FullAttachedWorkoutLog,
 } from "@/src/api/workoutLogApi";
-import { FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
+import { FullAttachedWorkout, FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
 import { Button, ClosableModal, Screen } from "@/src/components";
 import { ErrorBanner } from "@/src/components/ErrorBanner";
 import { logWorkoutStrategy } from "@/src/screens/workout/LogWorkoutEditorStrategy";
@@ -31,10 +30,10 @@ export default function WorkoutLogIndex() {
   const [updateId, setUpdateId] = useState<UUID | null>(null);
   const [allowEdit, setAllowEdit] = useState<boolean>(false);
   const [confirmDelete, setConfirmDelete] =
-    useState<FullAttachedWorkoutLog | null>(null);
+    useState<FullAttachedWorkout<'log'> | null>(null);
 
   const [displayedWorkouts, setDisplayedWorkouts] = useState<
-    FullAttachedWorkoutLog[]
+    FullAttachedWorkout<'log'>[]
   >([]);
 
   const [loading, setLoading] = useState(true);
@@ -83,9 +82,9 @@ export default function WorkoutLogIndex() {
         if (fw.exercises.length > names.length) {
           label += "...";
         }
-        previews[fw.logId] = label;
+        previews[fw.workoutId] = label;
       } else {
-        previews[fw.logId] = "No exercises logged";
+        previews[fw.workoutId] = "No exercises logged";
       }
     }
     return previews;
@@ -98,18 +97,18 @@ export default function WorkoutLogIndex() {
     setWorkoutViewIsActive(true);
   }
 
-  function openEditWorkout(fullWorkout: FullAttachedWorkoutLog) {
+  function openEditWorkout(fullWorkout: FullAttachedWorkout<'log'>) {
     setAllowEdit(true);
     setWorkoutViewIsActive(true);
-    const { logId, ...rest } = fullWorkout;
+    const { workoutId, ...rest } = fullWorkout;
     setFromWorkout(rest satisfies FullDetachedWorkoutForMode<"log">);
-    setUpdateId(logId satisfies UUID);
+    setUpdateId(workoutId satisfies UUID);
   }
 
-  function openViewWorkout(fullWorkout: FullAttachedWorkoutLog) {
+  function openViewWorkout(fullWorkout: FullAttachedWorkout<'log'>) {
     setAllowEdit(false);
     setWorkoutViewIsActive(true);
-    const { logId, ...rest } = fullWorkout;
+    const { workoutId, ...rest } = fullWorkout;
     setFromWorkout(rest satisfies FullDetachedWorkoutForMode<"log">);
   }
 
@@ -150,7 +149,7 @@ export default function WorkoutLogIndex() {
           variant="primary"
           style={{ marginLeft: "auto", borderRadius: 999, padding: 10 }}
           textProps={{
-            style: { ...typography.hint, color: colors.textOnPrimary },
+            style: { fontSize: typography.hint.fontSize, color: colors.textOnPrimary },
           }}
         />
       </View>
@@ -169,12 +168,12 @@ export default function WorkoutLogIndex() {
           displayedWorkouts.map((fw) => {
             const w = fw.workout;
 
-            const preview = previewByWorkoutId[fw.logId] ?? "";
+            const preview = previewByWorkoutId[fw.workoutId] ?? "";
             const totalSets = fw.sets.reduce((sum, s) => sum + s.length, 0);
 
             return (
               <Pressable
-                key={fw.logId}
+                key={fw.workoutId}
                 onPress={() => openViewWorkout(fw)}
                 style={styles.workoutCard}
               >
@@ -274,11 +273,11 @@ export default function WorkoutLogIndex() {
               return;
             }
             setLoading(true);
-            deleteWorkoutLog(confirmDelete.logId)
+            deleteWorkoutLog(confirmDelete.workoutId)
               .then(() => {
                 setDisplayedWorkouts(
                   displayedWorkouts.filter(
-                    (f) => f.logId !== confirmDelete.logId,
+                    (f) => f.workoutId !== confirmDelete.workoutId,
                   ),
                 );
                 showAlert("Log successfully deleted");

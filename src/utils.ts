@@ -178,6 +178,22 @@ export function isSubsetOf<T>(a: Set<T>, b: Set<T>): boolean {
   return true;
 }
 
+export function isSubsetOfArray<T>(a: Array<T>, b: Array<T>): boolean {
+  if (a === b) {
+    return true;
+  }
+  for (const ai of a) {
+    if (!b.includes(ai)) return false;
+  }
+  return true;
+}
+
+export function maxNullable(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.max(a, b);
+}
+
 export function toISODate(d: Date): ISODate {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -254,4 +270,43 @@ export function stringifyList(items: string[]): string {
   if (items.length === 1) return items[0];
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+/**
+ * https://stackoverflow.com/questions/51203917/math-behind-hsv-to-rgb-conversion-of-colors
+ */
+function hsvToRgb(h: number, s: number, v: number): {r: number, b: number, g: number} {
+    let r: number = 0;
+    let b: number = 0;
+    let g: number = 0;
+
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
+
+    switch(i % 6){
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+    }
+
+    return {
+      r: Math.round(r * 255),
+      g: Math.round(g * 255),
+      b: Math.round(b * 255),
+    };
+}
+
+export function rgbColorGenerator(step: number, maxSteps: number): string {
+  const h = (step % maxSteps) / maxSteps;
+  const s = 0.70;
+  const v = 0.95;
+
+  const rgb = hsvToRgb(h, s, v);
+  return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
 }
