@@ -6,7 +6,7 @@ import { CACHE_FACTORY } from "./swrCache";
 import { ISODate, ProfileRow, UUID } from "./types";
 import { DistanceUnit, TimeUnit, WeightUnit } from "./types/enums";
 
-const TTL_MS = 1 * MINUTE_MS;
+const TTL_MS = 5 * MINUTE_MS;
 type WrappedProfile = ProfileRow & { id: UUID };
 export const PROFILE_CACHE =
   CACHE_FACTORY.getOrCreateSwrIdCache<WrappedProfile>("profileCache", TTL_MS);

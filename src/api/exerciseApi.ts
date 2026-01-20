@@ -1,4 +1,3 @@
-import { NEVER_CHANGES_RESET_TIME } from "../constants";
 import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import { ExerciseMuscleRow, ExerciseRow, UUID } from "../types";
@@ -7,11 +6,11 @@ import { isSubsetOf, OmitNever, pageKey } from "../utils";
 
 const EXERCISE_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<ExerciseRow>(
   "exerciseCache",
-  NEVER_CHANGES_RESET_TIME,
+  null,
 );
 const EXERCISE_MUSCLE_CACHE = CACHE_FACTORY.getOrCreateSwrKeyedCache<
   Map<MuscleGroup, ExerciseMuscleRow>
->("exerciseMuscleCache", NEVER_CHANGES_RESET_TIME);
+>("exerciseMuscleCache", null);
 
 export async function fetchExercises(): Promise<Map<UUID, ExerciseRow>> {
   return EXERCISE_CACHE.fetch(async () => {

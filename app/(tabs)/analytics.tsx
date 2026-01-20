@@ -171,12 +171,12 @@ export default function Analytics() {
           Last Fetched: {volumesLastFetched?.toLocaleTimeString() ?? "n/a"}
         </Text>
       </View>
-      {isFetchingVolumes ? <ActivityIndicator/> : <Volumes
+      <Volumes
         workoutsForMuscleVolume={workoutsForMuscleVolume}
         refreshToken={refreshToken}
         workoutsDaysSpan={muscleVolumeDays}
         afterRefresh={() => setVolumesLastFetched(new Date())}
-      />}
+      />
       {/** ////////////////// */}
 
       <View style={{borderWidth: 1, borderColor: colors.border, margin: spacing.lg}}/>

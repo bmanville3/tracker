@@ -1,4 +1,3 @@
-import { NEVER_CHANGES_RESET_TIME } from "../constants";
 import { supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import { MuscleGroupRow } from "../types";
@@ -7,7 +6,7 @@ import { showAlert } from "../utils";
 
 const MUSCLE_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<MuscleGroupRow>(
   "muscleCache",
-  NEVER_CHANGES_RESET_TIME,
+  null,
 );
 
 async function fetchAllMuscleGroupsFromDb(): Promise<MuscleGroupRow[]> {

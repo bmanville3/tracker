@@ -23,18 +23,26 @@ interface CacheState<V> {
   value: V | null;
   lastFetchedMs: number | null;
   inFlight: Promise<V> | null;
+  version: number;
 }
 
 export class SwrKeyedCache<V> implements CacheHandle {
   private store = new Map<string, CacheState<V>>();
 
-  constructor(private readonly ttlMs: number) {}
+  /**
+   * Creates a new keyed cache.
+   * @param ttlMs An entries TTL before refreshing. If null, entries live forever.
+   */
+  constructor(private readonly ttlMs: number | null) {}
 
   private nowMs(): number {
     return Date.now();
   }
 
   private isFresh(entry: { lastFetchedMs: number | null }): boolean {
+    if (this.ttlMs === null) {
+      return true;
+    }
     return (
       entry.lastFetchedMs !== null &&
       this.nowMs() - entry.lastFetchedMs < this.ttlMs
@@ -48,6 +56,7 @@ export class SwrKeyedCache<V> implements CacheHandle {
       value: null,
       lastFetchedMs: null,
       inFlight: null,
+      version: 0,
     };
     this.store.set(key, e);
     return e;
@@ -76,10 +85,17 @@ export class SwrKeyedCache<V> implements CacheHandle {
     const e = this.entry(key);
     if (e.inFlight) return e.inFlight;
 
+    const startVersion = e.version;
+
     e.inFlight = (async () => {
       const v = await fetcher();
-      e.value = v;
-      e.lastFetchedMs = this.nowMs();
+      // If someone called set() (or otherwise bumped version) while we were fetching,
+      // do NOT overwrite the newer value.
+      if (e.version === startVersion) {
+        e.value = v;
+        e.lastFetchedMs = this.nowMs();
+      }
+
       return v;
     })().finally(() => {
       e.inFlight = null;
@@ -88,22 +104,37 @@ export class SwrKeyedCache<V> implements CacheHandle {
     return e.inFlight;
   }
 
+
   set(key: string, value: V): void {
     const e = this.entry(key);
     e.value = value;
+    e.lastFetchedMs = this.nowMs();
+    e.version += 1;
   }
 
+  /**
+   * This methods sets entry.lastFetchedMs = null at key.
+   * WARNING: If this.ttl = null (a forever cache), this method has NO effect.
+   */
   invalidate(key: string): void {
     const e = this.entry(key);
     e.lastFetchedMs = null;
   }
 
+  /**
+   * This methods sets entry.lastFetchedMs = null at keys matching the predicate.
+   * WARNING: If this.ttl = null (a forever cache), this method has NO effect.
+   */
   invalidateWhere(predicate: (key: string) => boolean): void {
     for (const key of this.store.keys()) {
       if (predicate(key)) this.invalidate(key);
     }
   }
 
+  /**
+   * This methods sets entry.lastFetchedMs = null for every key.
+   * WARNING: If this.ttl = null (a forever cache), this method has NO effect.
+   */
   invalidateAll(): void {
     for (const e of this.store.values()) e.lastFetchedMs = null;
   }
@@ -129,7 +160,11 @@ export class SwrIdCache<T extends Identified> implements CacheHandle {
   private static readonly KEY = "__all__";
   private readonly inner: SwrKeyedCache<Map<UUID, T>>;
 
-  constructor(private readonly ttlMs: number) {
+  /**
+   * Creates a new id cache wrapping a table.
+   * @param ttlMs An entries TTL before refreshing. If null, entries live forever.
+   */
+  constructor(private readonly ttlMs: number | null) {
     this.inner = new SwrKeyedCache<Map<UUID, T>>(ttlMs);
   }
 
@@ -150,19 +185,23 @@ export class SwrIdCache<T extends Identified> implements CacheHandle {
 
   upsert(row: T): void {
     const current = this.inner.peek(SwrIdCache.KEY);
-    if (current) {
-      current.set(row.id, row);
-      return;
-    }
-    const map = new Map<UUID, T>();
-    map.set(row.id, row);
-    this.inner.set(SwrIdCache.KEY, map);
+    const next = new Map(current ?? []);
+    next.set(row.id, row);
+    this.inner.set(SwrIdCache.KEY, next);
   }
 
   delete(id: UUID): void {
-    this.inner.peek(SwrIdCache.KEY)?.delete(id);
+    const current = this.inner.peek(SwrIdCache.KEY);
+    if (!current) return;
+    const next = new Map(current);
+    next.delete(id);
+    this.inner.set(SwrIdCache.KEY, next);
   }
 
+  /**
+   * This methods sets entry.lastFetchedMs = null.
+   * WARNING: If this.ttl = null (a forever cache), this method has NO effect.
+   */
   invalidate(): void {
     this.inner.invalidate(SwrIdCache.KEY);
   }
@@ -171,6 +210,10 @@ export class SwrIdCache<T extends Identified> implements CacheHandle {
     return this.inner.peek(SwrIdCache.KEY);
   }
 
+  /**
+   * This methods sets entry.lastFetchedMs = null.
+   * WARNING: If this.ttl = null (a forever cache), this method has NO effect.
+   */
   invalidateAll(): void {
     this.inner.invalidateAll();
   }
@@ -220,7 +263,7 @@ class CacheFactory implements CacheHandle {
 
   getOrCreateSwrIdCache<T extends Identified>(
     name: string,
-    ttlMs: number,
+    ttlMs: number | null,
   ): SwrIdCache<T> {
     // NOTE: pass the *class* SwrIdCache (no generics at runtime)
     return this.getOrCreate(
@@ -230,7 +273,7 @@ class CacheFactory implements CacheHandle {
     );
   }
 
-  getOrCreateSwrKeyedCache<V>(name: string, ttlMs: number): SwrKeyedCache<V> {
+  getOrCreateSwrKeyedCache<V>(name: string, ttlMs: number | null): SwrKeyedCache<V> {
     // NOTE: pass the *class* SwrKeyedCache (no generics at runtime)
     return this.getOrCreate(
       name,
