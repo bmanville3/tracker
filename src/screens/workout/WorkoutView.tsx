@@ -108,14 +108,7 @@ export interface WorkoutEditorModeStrategy<M extends WorkoutEditorMode> {
   ): React.JSX.Element | null;
 }
 
-function computeInitialState<M extends WorkoutEditorMode>(
-  strategy: WorkoutEditorModeStrategy<M>,
-  loadWithExisting: FullDetachedWorkoutForMode<M> | null | undefined,
-): FullDetachedWorkoutForMode<M> {
-  if (loadWithExisting) {
-    return loadWithExisting;
-  }
-
+function blankState<M extends WorkoutEditorMode>(strategy: WorkoutEditorModeStrategy<M>): FullDetachedWorkoutForMode<M> {
   return {
     workout: strategy.createEmptyWorkout(),
     exercises: [],
@@ -237,20 +230,35 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       setOpenDatePicker(false);
       setAdvancedSet(null);
       clearAdvancedExercise();
+      
+      if (loadWithExisting) {
+        setWorkout(loadWithExisting.workout);
+        setExercises(loadWithExisting.exercises);
+        setSets(loadWithExisting.sets);
+        if (updateWorkoutId) {
+          initialWorkoutRef.current = loadWithExisting.workout;
+          initialExercisesRef.current = loadWithExisting.exercises;
+          initialSetsRef.current = loadWithExisting.sets;
+        } else {
+          const initial = blankState(strategy);
+          initialWorkoutRef.current = initial.workout;
+          initialExercisesRef.current = initial.exercises;
+          initialSetsRef.current = initial.sets;
+        }
+      } else {
+        const initial = blankState(strategy);
+        initialWorkoutRef.current = initial.workout;
+        initialExercisesRef.current = initial.exercises;
+        initialSetsRef.current = initial.sets;
 
-      const initial = computeInitialState(strategy, loadWithExisting);
-
-      initialWorkoutRef.current = initial.workout;
-      initialExercisesRef.current = initial.exercises;
-      initialSetsRef.current = initial.sets;
-
-      setWorkout(initial.workout);
-      setExercises(initial.exercises);
-      setSets(initial.sets);
+        setWorkout(initial.workout);
+        setExercises(initial.exercises);
+        setSets(initial.sets);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [strategy, loadWithExisting]);
+  }, [strategy, loadWithExisting, updateWorkoutId]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -273,9 +281,8 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       editableExerciseEqual,
     );
     const sEqual = doubleArraysEqual(initialSets, sets, editableSetEqual);
-
     return !(wEqual && eEqual && sEqual);
-  }, [workout, exercises, sets]);
+  }, [workout, exercises, sets, initialWorkoutRef.current, initialExercisesRef.current, initialSetsRef.current]);
 
   const renderAssociatedProgram = () => {
     if (!workoutHasProgram(workout)) {
