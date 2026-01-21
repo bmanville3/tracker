@@ -1,4 +1,4 @@
-import { fetchWorkoutLogsInRange, fetchWorkoutLogsOnOrAfterDate } from "@/src/api/workoutLogApi";
+import { fetchWorkoutLogsInRange, fetchWorkoutLogsOnOrAfterDate, FULL_WORKOUT_LOG_CACHE_NAME, WORKOUT_LOG_HEADER_CACHE_NAME } from "@/src/api/workoutLogApi";
 import { FullAttachedWorkout } from "@/src/api/workoutSharedApi";
 import {
   Button,
@@ -8,11 +8,12 @@ import {
 import { CalendarModal } from "@/src/components/CalendarModal";
 import { ExerciseTracker } from "@/src/screens/analytics/ExerciseTracker";
 import { Volumes } from "@/src/screens/analytics/Volumes";
+import { CACHE_FACTORY } from "@/src/swrCache";
 import { colors, spacing, typography } from "@/src/theme";
 import { ISODate } from "@/src/types";
 import { requireGetUser, showAlert, toISODate } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -37,11 +38,7 @@ export default function Analytics() {
   ///////////
   // Volume Handles
   ///////////
-  const [refreshToken, setRefreshToken] = useState<number>(0);
   const [muscleVolumeDays, setMuscleVolumeDays] = useState<number>(7);
-  const [volumesLastFetched, setVolumesLastFetched] = useState<Date | null>(
-    null,
-  );
   const [workoutsForMuscleVolume, setWorkoutsForMuscleVolume] = useState<FullAttachedWorkout<'log'>[]>([]);
   const [isFetchingVolumes, setIsFetchingVolumes] = useState<boolean>(false);
   ///////////
@@ -65,37 +62,7 @@ export default function Analytics() {
   ///////////
   ///////////
 
-  useEffect(() => {
-    const days = 7;
-    setMuscleVolumeDays(days);
-    setWorkoutsForMuscleVolume([]);
-    setVolumesLastFetched(null);
-    setOpenDatePicker(false);
-    setDatePickerFn(null);
-    setStartDate(getDaySpanIncludingToday(30));
-    setEndDate(getDaySpanIncludingToday(1));
-    setCalendarTitle('');
-    fetchMuscleVolumes(getDaySpanIncludingToday(days));
-    fetchWorkoutForExercies();
-  }, []);
-
-  const fetchMuscleVolumes = async (onOrAfterDate: ISODate) => {
-    setIsFetchingVolumes(true);
-    try {
-      const user = await requireGetUser();
-      if (!user) return;
-      const workouts = await fetchWorkoutLogsOnOrAfterDate(onOrAfterDate);
-      setWorkoutsForMuscleVolume(workouts);
-      setRefreshToken((prev) => prev + 1);
-    } finally {
-      setIsFetchingVolumes(false);
-    }
-  };
-
-  const fetchWorkoutForExercies = async () => {
-    if (initStart.current === startDate && initEnd.current === endDate) {
-      return;
-    }
+  const fetchWorkoutsForExercises = useCallback(async () => {
     setIsFetchingWorkoutsForExercise(true);
     try {
       setWorkoutsForExercises(await fetchWorkoutLogsInRange(startDate, endDate));
@@ -104,7 +71,29 @@ export default function Analytics() {
     } finally {
       setIsFetchingWorkoutsForExercise(false);
     }
-  }
+  }, [startDate, endDate]);
+
+  const fetchMuscleVolumes = useCallback(async () => {
+    setIsFetchingVolumes(true);
+    try {
+      const workouts = await fetchWorkoutLogsOnOrAfterDate(getDaySpanIncludingToday(muscleVolumeDays));
+      setWorkoutsForMuscleVolume(workouts);
+    } finally {
+      setIsFetchingVolumes(false);
+    }
+  }, [muscleVolumeDays]);
+
+  useEffect(() => { fetchMuscleVolumes(); }, [fetchMuscleVolumes]);
+  useEffect(() => { fetchWorkoutsForExercises(); }, [fetchWorkoutsForExercises]);
+
+  useEffect(() => {
+    return CACHE_FACTORY.subscribe((e) => {
+      if (e.cacheName === FULL_WORKOUT_LOG_CACHE_NAME) {
+        fetchMuscleVolumes();
+        fetchWorkoutsForExercises();
+      }
+    });
+  }, [fetchMuscleVolumes, fetchWorkoutsForExercises]);
 
   return (
     <Screen center={false}>
@@ -137,9 +126,6 @@ export default function Analytics() {
               return;
             }
             setMuscleVolumeDays(value);
-            setWorkoutsForMuscleVolume([]);
-            setVolumesLastFetched(null);
-            fetchMuscleVolumes(getDaySpanIncludingToday(value));
           }}
           pressableProps={{
             style: {
@@ -150,32 +136,9 @@ export default function Analytics() {
           disabled={isFetchingVolumes}
         />
       </View>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: spacing.sm,
-          marginBottom: spacing.sm,
-        }}
-      >
-        <Feather
-          name="refresh-ccw"
-          onPress={() =>
-            fetchMuscleVolumes(getDaySpanIncludingToday(muscleVolumeDays))
-          }
-          isEnabled={!isFetchingVolumes}
-          size={18}
-          style={{ marginLeft: spacing.sm }}
-        />
-        <Text style={typography.hint}>
-          Last Fetched: {volumesLastFetched?.toLocaleTimeString() ?? "n/a"}
-        </Text>
-      </View>
       <Volumes
         workoutsForMuscleVolume={workoutsForMuscleVolume}
-        refreshToken={refreshToken}
-        workoutsDaysSpan={muscleVolumeDays}
-        afterRefresh={() => setVolumesLastFetched(new Date())}
+        daysSpan={muscleVolumeDays}
       />
       {/** ////////////////// */}
 
@@ -226,7 +189,7 @@ export default function Analytics() {
           title={"Recompute"}
           style={{ alignSelf: 'flex-start', padding: spacing.padding_sm }}
           textProps={{ style: {fontSize: typography.body.fontSize} }}
-          onPress={fetchWorkoutForExercies}
+          onPress={fetchWorkoutsForExercises}
           disabled={initStart.current === startDate && initEnd.current === endDate || isFetchingWorkoutsForExercise}
         />
       </View>

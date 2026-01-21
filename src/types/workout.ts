@@ -10,8 +10,11 @@ import { AllOrNothing, ISODate, UUID } from "./generic";
 
 export type AssociatedProgramFields = {
   program_id: UUID;
+  /** 0 indexed. */
   day_in_week: number;
+  /** 0 indexed. */
   week_in_block: number;
+  /** 0 indexed. */
   block_in_program: number;
 };
 

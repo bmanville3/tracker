@@ -12,7 +12,7 @@ import {
   WorkoutLogRow,
 } from "../types";
 import { anyErrorToString, OmitNever, requireGetUser, showAlert } from "../utils";
-import { fetchExercises } from "./exerciseApi";
+import { EXERCISE_CACHE_NAME, fetchExercises } from "./exerciseApi";
 import {
   EditableExercise,
   EditableSet,
@@ -21,35 +21,49 @@ import {
   FullDetachedWorkoutForMode,
 } from "./workoutSharedApi";
 
+export const FULL_WORKOUT_LOG_CACHE_NAME = "fullWorkoutLogCache";
 /**
  * A mapping of WorkoutLogRow.UUIDs to FullAttachedWorkout<'log'>
  */
 const FULL_WORKOUT_LOG_CACHE =
   CACHE_FACTORY.getOrCreateSwrKeyedCache<FullAttachedWorkout<'log'>>(
-    "fullWorkoutLogCache",
+    FULL_WORKOUT_LOG_CACHE_NAME,
     null,
   );
+
+export const WORKOUT_LOG_HEADER_CACHE_NAME = 'workoutLogHeaderCache';
 // a user would realistically do 5 workouts a week * 52 weeks a year = 120 workouts a year
 // workout log rows are actually small so we will do this so we do not have to worry about
 // overlapping queries on the database (fetching date ranges, fetching last N workouts, etc)
 /**
  * A user database cache of the workout_log table.
  */
-const WORKOUT_LOG_HEADER_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<WorkoutLogRow>('workoutLogHeaderCache', null);
-const DATE_INDEX: [ISODate, UUID[]][] = []
+const WORKOUT_LOG_HEADER_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<WorkoutLogRow>(WORKOUT_LOG_HEADER_CACHE_NAME, null);
 
-function addToDateIndex(workout: WorkoutLogRow) {
-  if (DATE_INDEX.length == 0) {
-    DATE_INDEX.push([workout.completed_on, [workout.id]]);
-    return;
-  }
-  let L = 0;
-  let R = DATE_INDEX.length - 1;
-  while (L < R) {
-    const M = Math.trunc((L + R) / 2);
 
+CACHE_FACTORY.subscribe(async (e) => {
+  if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'write' && e.key !== undefined) {
+    const newExercise = (await fetchExercises()).get(e.key);
+    if (!newExercise) {
+      console.error(`Got write commit but ${e.key} could not be found in new exercises`);
+      return;
+    }
+    const workoutsToUpdate: Map<UUID, FullAttachedWorkout<'log'>> = new Map();
+    FULL_WORKOUT_LOG_CACHE.getInnerMap().forEach(workout => {
+      if (workout.exercises.some((ex) => ex.exercise.id === e.key)) {
+        workoutsToUpdate.set(workout.workoutId, {...workout, exercises: workout.exercises.map((ex) => {
+          if (ex.exercise.id === e.key) {
+            return {...ex, exercise: newExercise}
+          } else {
+            return ex;
+          }
+        })})
+      }
+    });
+    FULL_WORKOUT_LOG_CACHE.setAll(workoutsToUpdate);
   }
-}
+});
+
 
 export function databaseRowToWorkoutLogRow(
   data: Database["public"]["Tables"]["workout_log"]["Row"],
@@ -188,9 +202,7 @@ export async function upsertWorkoutLog(ctx: {
     showAlert("Error upserting workout log", workoutLogErr.message);
     return [false, workoutLogId ?? null];
   }
-
-  // at the very least the header has been updated so go ahead and clean it up
-  WORKOUT_LOG_HEADER_CACHE.upsert(databaseRowToWorkoutLogRow(workoutLogRow));
+  let runAfter: () => void = () => {};
   try {
     const exercisePayload: OmitNever<WorkoutExerciseLogRow, "id">[] =
     exercises.map((ex, i) => {
@@ -248,13 +260,19 @@ export async function upsertWorkoutLog(ctx: {
         .in("id", oldExerciseWorkoutIds);
       if (deleteOldExercises) throw deleteOldExercises;
     }
-    FULL_WORKOUT_LOG_CACHE.set(workoutLogRow.id, {...payload, workoutId: workoutLogRow.id})
+    runAfter = () => {
+      FULL_WORKOUT_LOG_CACHE.set(workoutLogRow.id, {...payload, workoutId: workoutLogRow.id});
+    }
     return [true, workoutLogRow.id];
   } catch (e) {
     showAlert("Error updating workout", anyErrorToString(e, 'Unknown error'));
     // partial state too hard to recover from -> force refetch next fetch
-    FULL_WORKOUT_LOG_CACHE.delete(workoutLogRow.id);
+    runAfter = () => {
+      FULL_WORKOUT_LOG_CACHE.delete(workoutLogRow.id);
+    }
     return [false, workoutLogRow.id];
+  } finally {
+    WORKOUT_LOG_HEADER_CACHE.upsert(databaseRowToWorkoutLogRow(workoutLogRow), runAfter);
   }
 }
 
@@ -265,8 +283,9 @@ export async function deleteWorkoutLog(workoutId: UUID): Promise<void> {
     .delete()
     .eq("id", workoutId);
   if (error) throw error;
-  FULL_WORKOUT_LOG_CACHE.delete(workoutId);
-  WORKOUT_LOG_HEADER_CACHE.delete(workoutId);
+  FULL_WORKOUT_LOG_CACHE.delete(workoutId, () => {
+    WORKOUT_LOG_HEADER_CACHE.delete(workoutId);
+  });
 }
 
 function buildFullWorkoutFromAllBatch(
@@ -419,11 +438,13 @@ export async function fullAttachedWorkoutLogFromWorkoutLogIds(
   const programById = new Map<UUID, ProgramRow>();
   for (const p of allProgramRows) programById.set(p.id, p);
 
+  const newlyCompleted = new Map();
   workoutLogRows.forEach((w) => {
     const fullWorkout = buildFullWorkoutFromAllBatch(w, programById, exByWorkout, setsByExWk, allExercises);
     completed.set(w.id, fullWorkout);
-    FULL_WORKOUT_LOG_CACHE.set(w.id, fullWorkout);
+    newlyCompleted.set(w.id, fullWorkout);
   })
+  FULL_WORKOUT_LOG_CACHE.setAll(newlyCompleted);
 
   return completed;
 }

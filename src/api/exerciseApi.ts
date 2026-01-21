@@ -4,17 +4,18 @@ import { ExerciseMuscleRow, ExerciseRow, UUID } from "../types";
 import { ExerciseAndMuscleTag, MuscleGroup } from "../types/enums";
 import { isSubsetOf, OmitNever, pageKey } from "../utils";
 
+export const EXERCISE_CACHE_NAME = "exerciseCache";
 const EXERCISE_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<ExerciseRow>(
-  "exerciseCache",
+  EXERCISE_CACHE_NAME,
   null,
 );
+export const EXERCISE_MUSCLE_CACHE_NAME = "exerciseMuscleCache";
 const EXERCISE_MUSCLE_CACHE = CACHE_FACTORY.getOrCreateSwrKeyedCache<
   Map<MuscleGroup, ExerciseMuscleRow>
->("exerciseMuscleCache", null);
+>(EXERCISE_MUSCLE_CACHE_NAME, null);
 
 export async function fetchExercises(): Promise<Map<UUID, ExerciseRow>> {
   return EXERCISE_CACHE.fetch(async () => {
-    console.log("Fetching the exercise table from the database...");
     const { data, error } = await supabase.from("exercise").select("*");
     if (error) throw error;
     return data satisfies ExerciseRow[];

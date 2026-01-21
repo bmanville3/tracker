@@ -1,16 +1,16 @@
-/**
- * Goal:
- * - All caches are created ONLY via CacheFactory.
- * - Every cache created is registered.
- * - SwrCache and SwrKeyedCache are related: SwrCache is a thin wrapper around SwrKeyedCache.
- *
- * Pattern:
- * - Keep SwrKeyedCache as the "engine".
- * - Make SwrCache wrap a SwrKeyedCache<Map<UUID, T>> with a single internal key.
- * - Caches can only be constructed with a factory. Only one factory exists.
- */
-
 import { UUID } from "./types";
+
+type CacheEvent =
+  | { type: "write"; cacheName: string; key?: string }
+  | { type: "delete"; cacheName: string; key?: string }
+  | { type: "clearAll"; cacheName: string; key?: never };
+
+type NotifyEvent =
+  | { type: "write"; key?: string }
+  | { type: "delete"; key?: string }
+  | { type: "clearAll"; key?: never };
+
+type CacheListener = (e: CacheEvent) => void;
 
 type Identified = { id: UUID };
 
@@ -33,7 +33,11 @@ export class SwrKeyedCache<V> implements CacheHandle {
    * Creates a new keyed cache.
    * @param ttlMs An entries TTL before refreshing. If null, entries live forever.
    */
-  constructor(private readonly ttlMs: number | null) {}
+  constructor(
+    private readonly name: string,
+    private readonly ttlMs: number | null,
+    private readonly notify?: (e: NotifyEvent) => void,
+  ) {}
 
   private nowMs(): number {
     return Date.now();
@@ -66,24 +70,25 @@ export class SwrKeyedCache<V> implements CacheHandle {
     return this.store.get(key)?.value ?? null;
   }
 
-  async fetch(key: string, fetcher: () => Promise<V>): Promise<V> {
+  async fetch(key: string, fetcher: () => Promise<V>, beforeNotify?: () => void): Promise<V> {
     const e = this.entry(key);
 
     if (e.value !== null) {
       if (!this.isFresh(e)) {
-        void this.refresh(key, fetcher).catch((err) => {
+        void this.refresh(key, fetcher, beforeNotify).catch((err) => {
           console.error(`SWR refresh failed for key=${key}`, err);
         });
       }
       return e.value;
     }
-
-    return await this.refresh(key, fetcher);
+    console.debug(`'${key}' had complete cache miss in cache '${this.name}'. Fetching from database`);
+    return await this.refresh(key, fetcher, beforeNotify);
   }
 
-  async refresh(key: string, fetcher: () => Promise<V>): Promise<V> {
+  async refresh(key: string, fetcher: () => Promise<V>, beforeNotify?: () => void): Promise<V> {
     const e = this.entry(key);
     if (e.inFlight) return e.inFlight;
+    console.debug(`Refreshing '${key}' in cache '${this.name}'`);
 
     const startVersion = e.version;
 
@@ -91,25 +96,53 @@ export class SwrKeyedCache<V> implements CacheHandle {
       const v = await fetcher();
       // If someone called set() (or otherwise bumped version) while we were fetching,
       // do NOT overwrite the newer value.
+      let committed = false;
       if (e.version === startVersion) {
         e.value = v;
         e.lastFetchedMs = this.nowMs();
+        committed = true;
       }
 
-      return v;
+      return { v, committed };
     })().finally(() => {
       e.inFlight = null;
-    });
+    })
+    .then(({ v, committed }) => {
+      if (committed) {
+        if (beforeNotify) {
+          beforeNotify();
+        }
+        this.notify?.({ type: "write", key });
+      }
+      return v;
+    });;
 
     return e.inFlight;
   }
 
 
-  set(key: string, value: V): void {
+  set(key: string, value: V, beforeNotify?: () => void): void {
     const e = this.entry(key);
     e.value = value;
     e.lastFetchedMs = this.nowMs();
     e.version += 1;
+    if (beforeNotify) {
+      beforeNotify();
+    }
+    this.notify?.({ type: "write", key });
+  }
+
+  setAll(keysToValues: Map<string, V>, beforeNotify?: () => void): void {
+    for (const [key, value] of keysToValues) {
+      const e = this.entry(key);
+      e.value = value;
+      e.lastFetchedMs = this.nowMs();
+      e.version += 1;
+    }
+    if (beforeNotify) {
+      beforeNotify();
+    }
+    this.notify?.({ type: "write" });
   }
 
   /**
@@ -139,8 +172,12 @@ export class SwrKeyedCache<V> implements CacheHandle {
     for (const e of this.store.values()) e.lastFetchedMs = null;
   }
 
-  clearAll(): void {
+  clearAll(beforeNotify?: () => void): void {
     this.store.clear();
+    if (beforeNotify) {
+      beforeNotify();
+    }
+    this.notify?.({ type: "clearAll" });
   }
 
   getInnerMap(): Map<string, V> {
@@ -151,8 +188,15 @@ export class SwrKeyedCache<V> implements CacheHandle {
     ) as Map<string, V>;
   }
 
-  delete(key: string): boolean {
-    return this.store.delete(key);
+  delete(key: string, beforeNotify?: () => void): boolean {
+    const ok = this.store.delete(key);
+    if (ok) {
+      if (beforeNotify) {
+        beforeNotify();
+      }
+      this.notify?.({ type: "delete", key });
+    }
+    return ok;
   }
 }
 
@@ -164,8 +208,12 @@ export class SwrIdCache<T extends Identified> implements CacheHandle {
    * Creates a new id cache wrapping a table.
    * @param ttlMs An entries TTL before refreshing. If null, entries live forever.
    */
-  constructor(private readonly ttlMs: number | null) {
-    this.inner = new SwrKeyedCache<Map<UUID, T>>(ttlMs);
+  constructor(
+    name: string,
+    ttlMs: number | null,
+    private readonly notify?: (e: NotifyEvent) => void,
+  ) {
+    this.inner = new SwrKeyedCache<Map<UUID, T>>(name, ttlMs);
   }
 
   private async buildMap(fetchCall: () => Promise<T[]>): Promise<Map<UUID, T>> {
@@ -175,27 +223,36 @@ export class SwrIdCache<T extends Identified> implements CacheHandle {
     return map;
   }
 
-  async fetch(fetchCall: () => Promise<T[]>): Promise<Map<UUID, T>> {
-    return this.inner.fetch(SwrIdCache.KEY, () => this.buildMap(fetchCall));
+  async fetch(fetchCall: () => Promise<T[]>, beforeNotify?: () => void): Promise<Map<UUID, T>> {
+    return this.inner.fetch(SwrIdCache.KEY, () => this.buildMap(fetchCall), () => {
+      if (beforeNotify) {
+        beforeNotify();
+      }
+      this.notify?.({ type: "write" });
+    });
   }
 
-  async refresh(fetchCall: () => Promise<T[]>): Promise<Map<UUID, T>> {
-    return this.inner.refresh(SwrIdCache.KEY, () => this.buildMap(fetchCall));
-  }
-
-  upsert(row: T): void {
+  upsert(row: T, beforeNotify?: () => void): void {
     const current = this.inner.peek(SwrIdCache.KEY);
     const next = new Map(current ?? []);
     next.set(row.id, row);
     this.inner.set(SwrIdCache.KEY, next);
+    if (beforeNotify) {
+      beforeNotify();
+    }
+    this.notify?.({ type: "write", key: row.id });
   }
 
-  delete(id: UUID): void {
+  delete(id: UUID, beforeNotify?: () => void): void {
     const current = this.inner.peek(SwrIdCache.KEY);
     if (!current) return;
     const next = new Map(current);
     next.delete(id);
     this.inner.set(SwrIdCache.KEY, next);
+    if (beforeNotify) {
+      beforeNotify();
+    }
+    this.notify?.({ type: "delete", key: id });
   }
 
   /**
@@ -218,8 +275,8 @@ export class SwrIdCache<T extends Identified> implements CacheHandle {
     this.inner.invalidateAll();
   }
 
-  clearAll(): void {
-    this.inner.clearAll();
+  clearAll(beforeNotify?: () => void): void {
+    this.inner.clearAll(beforeNotify);
   }
 
   getInnerMap() {
@@ -231,6 +288,23 @@ type CacheCtor<T extends CacheHandle> = abstract new (...args: any[]) => T;
 
 class CacheFactory implements CacheHandle {
   private readonly registry = new Map<string, CacheHandle>();
+  private readonly listeners = new Set<CacheListener>();
+
+  subscribe(listener: CacheListener): () => void {
+    this.listeners.add(listener);
+    console.debug(`New listener added. Total: ${this.listeners.size} listeners`);
+    return () => {
+      this.listeners.delete(listener);
+      console.debug(`Listener removed. Total: ${this.listeners.size} listeners`);
+    };
+  }
+
+  emit(e: CacheEvent): void {
+    console.debug(`New emission to listeners: ${JSON.stringify(e)}`);
+    for (const l of this.listeners) {
+      try { l(e); } catch (err) { console.error("cache listener failed", err); }
+    }
+  }
 
   private getOrCreate<T extends CacheHandle>(
     name: string,
@@ -258,6 +332,7 @@ class CacheFactory implements CacheHandle {
     }
 
     this.registry.set(name, cache);
+    console.debug(`New cache added '${name}'. Total: ${this.registry.size} caches`);
     return cache;
   }
 
@@ -269,7 +344,11 @@ class CacheFactory implements CacheHandle {
     return this.getOrCreate(
       name,
       SwrIdCache<T>,
-      () => new SwrIdCache<T>(ttlMs),
+      () =>
+        new SwrIdCache<T>(name, ttlMs, (evt) => {
+          if (evt.type === "clearAll") this.emit({ type: "clearAll", cacheName: name });
+          else this.emit({ ...evt, cacheName: name } as CacheEvent);
+        }),
     );
   }
 
@@ -278,23 +357,30 @@ class CacheFactory implements CacheHandle {
     return this.getOrCreate(
       name,
       SwrKeyedCache<V>,
-      () => new SwrKeyedCache<V>(ttlMs),
+      () =>
+        new SwrKeyedCache<V>(name, ttlMs, (evt) =>
+          this.emit({ ...evt, cacheName: name } as CacheEvent),
+        ),
     );
   }
 
   invalidateAll(): void {
+    console.debug(`Invalidating all caches`);
     for (const c of this.registry.values()) c.invalidateAll();
   }
 
   clearAll(): void {
+    console.debug(`Clearing all caches`);
     for (const c of this.registry.values()) c.clearAll();
   }
 
   invalidate(name: string): void {
+    console.debug(`Invalidating ${name} cache`);
     this.registry.get(name)?.invalidateAll();
   }
 
   clear(name: string): void {
+    console.debug(`Clearing ${name} cache`);
     this.registry.get(name)?.clearAll();
   }
 

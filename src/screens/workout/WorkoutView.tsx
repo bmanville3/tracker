@@ -42,6 +42,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { ExerciseModal } from "../exercise/ExerciseModal";
 import { VolumeRender } from "../exercise/VolumeRender";
+import { CACHE_FACTORY } from "@/src/swrCache";
+import { EXERCISE_CACHE_NAME, fetchExercises } from "@/src/api/exerciseApi";
 
 export type SetRenderProps<M extends WorkoutEditorMode> = {
   set: EditableSet<M>;
@@ -185,6 +187,36 @@ export function WorkoutView<M extends WorkoutEditorMode>(
   const initialWorkoutRef = useRef<EditableWorkout<M> | null>(null);
   const initialExercisesRef = useRef<EditableExercise<M>[] | null>(null);
   const initialSetsRef = useRef<EditableSet<M>[][] | null>(null);
+
+  useEffect(() => {
+    return CACHE_FACTORY.subscribe(async (e) => {
+      if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'write' && e.key !== undefined) {
+        const newExercise = (await fetchExercises()).get(e.key);
+        if (!newExercise) {
+          console.error(`Got write commit but ${e.key} could not be found in new exercises`);
+          return;
+        }
+        const _updateExercises = (exers: EditableExercise<M>[] | null, setFunction: (a: EditableExercise<M>[]) => void) => {
+          if (exers === null) {
+            return;
+          }
+          if (!exers.some(ex => ex.exercise.id === newExercise.id)) {
+            return;
+          }
+          const newExers = exers.map(ex => {
+            if (ex.exercise.id === newExercise.id) {
+              return {...ex, exercise: newExercise};
+            } else {
+              return ex;
+            }
+          });
+          setFunction(newExers);
+        }
+        _updateExercises(exercises, setExercises);
+        _updateExercises(initialExercisesRef.current, (a) => { initialExercisesRef.current = a });
+      }
+    });
+  }, [exercises]);
 
   const clearAdvancedExercise = () => {
     setAdvancedExercise(null);
@@ -1178,6 +1210,8 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       {renderAdvancedSet()}
       {!openExercisePicker && renderAdvancedExercise()}
       <ExerciseModal
+        allowDeleteExercises={true}
+        allowEditExercises={true}
         allowSelectExercises={true}
         allowCreateExercises={true}
         visible={openExercisePicker}

@@ -1,6 +1,6 @@
-import { fetchExerciseMuscleVolumes } from "@/src/api/exerciseApi";
+import { EXERCISE_MUSCLE_CACHE_NAME, fetchExerciseMuscleVolumes } from "@/src/api/exerciseApi";
 import { fetchMuscleGroups } from "@/src/api/muscleApi";
-import { FullAttachedWorkout, WorkoutEditorMode } from "@/src/api/workoutSharedApi";
+import { FullAttachedWorkout, isFullAttachedLogWorkouts, isFullAttachedTemplateWorkouts, WorkoutEditorMode } from "@/src/api/workoutSharedApi";
 import {
   Button,
   ClosableModal,
@@ -16,9 +16,9 @@ import {
   MuscleGroupRow,
   UUID
 } from "@/src/types";
-import { requireGetUser } from "@/src/utils";
+import { daysBetweenDates, requireGetUser } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -28,42 +28,42 @@ import {
 } from "react-native";
 import { BarChart, barDataItem } from "react-native-gifted-charts";
 import { Contribution, emptyContributionRecord, emptyMGRecord, extractVolumes } from "./helpers";
+import { CACHE_FACTORY } from "@/src/swrCache";
 
 type VolumesProps<M extends WorkoutEditorMode> = {
   /** Workouts to model volume. */
   workoutsForMuscleVolume: FullAttachedWorkout<M>[];
-  /** Increment this to refresh the data. */
-  refreshToken: number;
-  /** Number of days the workouts span. Should be >0. */
-  workoutsDaysSpan: number;
-
-  afterRefresh?: () => void;
+  daysSpan?: number | null;
 }
 
-export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
-  const { workoutsForMuscleVolume, refreshToken, workoutsDaysSpan, afterRefresh } = props;
-  ///////////
-  // Start volume related thing
-  ///////////
+function daysToLabel(number: 1 | 7 | 30 | 365) {
+  return number === 1 ? "Daily" :
+    number === 7 ? "Weekly" :
+    number === 30 ? "Monthly" :
+    "Yearly"
+}
 
-  // volume helpers
+export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
+  const { workoutsForMuscleVolume, daysSpan } = props;
+  // If is fetching volumes of the workouts.
   const [isFetchingVolumes, setIsFetchingVolumes] = useState<boolean>(false);
-
   // whats actually fetched by above query
   const [exerciseToMuscleVolume, setExerciseToMuscleVolume] = useState<
     Map<UUID, Map<MuscleGroup, ExerciseMuscleRow>>
   >(new Map());
-
-  // extraction of workoutsForMuscleVolume
+  // per exercise extraction of workoutsForMuscleVolume
   const [exerciseContributionToVolume, setExerciseContributionToVolume] =
     useState<Record<MuscleGroup, Map<UUID, Contribution>>>(
       emptyContributionRecord(),
     );
+  // when true, opens up a pop up showing exercise contributions
   const [openExerciseContribution, setOpenExerciseContribution] = useState<
     [string, [UUID, Contribution][]] | null
   >(null);
+  // the flat out muscle volumes from all the workouts
   const [muscleVolumes, setMuscleVolumes] =
     useState<Record<MuscleGroup, number>>(emptyMGRecord());
+  // id to row in database
   const [muscleGroupsToRow, setMuscleGroupsToRow] = useState<
     Map<MuscleGroup, MuscleGroupRow>
   >(new Map());
@@ -71,7 +71,7 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
   // advanced settings for volume
   const [showAdvancedVolumeSettings, setShowAdvancedVolumeSettings] =
     useState<boolean>(false);
-  const [showAsNDayAverage, setShowAsNDayAverage] = useState<number | null>(
+  const [showAsNDayAverage, setShowAsNDayAverage] = useState<1 | 7 | 30 | 365 | null>(
     null,
   );
   const [filterWarmups, setFilterWarmups] = useState<boolean>(true);
@@ -79,89 +79,105 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
   const [disableFractionalVolume, setDisableFractionalVolume] =
     useState<boolean>(false);
 
-  ///////////
-  // Volume related thing
-  ///////////
-
-  const resetAdvanced = () => {
-    setShowAsNDayAverage(null);
-    setFilterWarmups(true);
-    setMustBeGeEqThresh(null);
-    setDisableFractionalVolume(false);
-    setShowAdvancedVolumeSettings(false);
-  }
-
-  const resetVolumes = () => {
-    setMuscleVolumes(emptyMGRecord());
-    setOpenExerciseContribution(null);
-    setExerciseToMuscleVolume(new Map());
-    setExerciseContributionToVolume(emptyContributionRecord());
-    (async () => {
-      setMuscleGroupsToRow(await fetchMuscleGroups());
-      await fetchMuscleVolumeForGivenWorkout();
-    })();
-  }
-
-  useEffect(() => {
-    resetAdvanced();
-    resetVolumes();
-  }, [])
-
-  useEffect(() => {
-    resetVolumes();
-  }, [workoutsForMuscleVolume, refreshToken]);
-
-  const fetchMuscleVolumeForGivenWorkout = async () => {
-    setIsFetchingVolumes(true);
-    const user = await requireGetUser();
-    if (!user) {
-      setIsFetchingVolumes(false);
-      return;
+  const numDaysSpanned = useMemo(() => {
+    if (daysSpan !== undefined && daysSpan !== null) {
+      return daysSpan;
     }
-    try {
-      const uniqueExerciseIds = new Set<UUID>();
-      for (const w of workoutsForMuscleVolume) {
-        for (const ex of w.exercises) {
-          uniqueExerciseIds.add(ex.exercise.id);
+    if (workoutsForMuscleVolume.length === 0 || workoutsForMuscleVolume.length === 1) {
+      return workoutsForMuscleVolume.length;
+    }
+    if (isFullAttachedLogWorkouts(workoutsForMuscleVolume)) {
+      let firstDay = workoutsForMuscleVolume[0].workout.completed_on;
+      let lastDay = workoutsForMuscleVolume[0].workout.completed_on;
+      for (const workout of workoutsForMuscleVolume) {
+        if (workout.workout.completed_on < firstDay) {
+          firstDay = workout.workout.completed_on;
+        }
+        if (workout.workout.completed_on > lastDay) {
+          lastDay = workout.workout.completed_on;
         }
       }
-      const newMap = new Map<UUID, Map<MuscleGroup, ExerciseMuscleRow>>();
-      for (const exId of uniqueExerciseIds) {
-        const volumeForExercise = await fetchExerciseMuscleVolumes(
-          exId,
-          user.user_id,
-        );
-        newMap.set(exId, volumeForExercise);
+      // only one day, the below returns 0 so +1. only two days, the below returns 1 so +1. ....
+      return daysBetweenDates(firstDay, lastDay) + 1;
+    } else if (isFullAttachedTemplateWorkouts(workoutsForMuscleVolume)) {
+      const blockToWeeks: Map<number, Set<number>> = new Map();
+      workoutsForMuscleVolume.forEach((w) => {
+        const block = w.workout.block_in_program;
+        const week = w.workout.week_in_block;
+        blockToWeeks.set(block, (blockToWeeks.get(block) ?? new Set()).add(week));
+      })
+      let numWeeks = 0;
+      blockToWeeks.values().forEach((s) => {
+        let lastWeek = -1;
+        for (const wk of s) {
+          if (wk > lastWeek) lastWeek = wk;
+        }
+        // last week is 0 indexed
+        numWeeks += lastWeek + 1;
+      })
+      return numWeeks * 7;
+    } else {
+      throw new Error(`Cannot process workouts due to type: ${JSON.stringify(workoutsForMuscleVolume)}`);
+    }
+  }, [workoutsForMuscleVolume, daysSpan]);
+
+  const uniqueExerciseIds = useMemo(() => {
+    const ids = new Set<UUID>();
+    for (const w of workoutsForMuscleVolume) {
+      for (const ex of w.exercises) {
+        ids.add(ex.exercise.id);
       }
+    }
+    return ids;
+  }, [workoutsForMuscleVolume]);
+
+  useEffect(() => {
+    void (async () => setMuscleGroupsToRow(await fetchMuscleGroups()))();
+  }, []);
+
+  const fetchMuscleVolumeForGivenWorkout = useCallback(async () => {
+    setIsFetchingVolumes(true);
+    try {
+      const user = await requireGetUser();
+      if (!user) return;
+
+      const entries = await Promise.all(
+        [...uniqueExerciseIds].map(async (exId) => {
+          const volume = await fetchExerciseMuscleVolumes(exId, user.user_id);
+          return [exId, volume] as const;
+        }),
+      );
+      const newMap = new Map(entries);
+
+      const { newContributionRecord, totalVolume } = extractVolumes({
+        exToMuscVolume: newMap,
+        workoutsForMuscleVolume,
+        filterWarmups,
+        mustBeGeEqThresh,
+        disableFractionalVolume
+      });
+      setExerciseContributionToVolume(newContributionRecord);
+      setMuscleVolumes(totalVolume);
       setExerciseToMuscleVolume(newMap);
-      loadVolumeFieldsFromState(newMap);
-      if (afterRefresh) {
-        afterRefresh();
-      }
     } finally {
       setIsFetchingVolumes(false);
     }
-  };
-
-  const loadVolumeFieldsFromState = (exToMuscVolume: Map<string, Map<MuscleGroup, ExerciseMuscleRow>>) => {
-    const { newContributionRecord, totalVolume } = extractVolumes({
-      exToMuscVolume,
-      workoutsForMuscleVolume,
-      filterWarmups,
-      mustBeGeEqThresh,
-      disableFractionalVolume
-    });
-    setExerciseContributionToVolume(newContributionRecord);
-    setMuscleVolumes(totalVolume);
-  };
-
-  useEffect(() => loadVolumeFieldsFromState(exerciseToMuscleVolume), [
+  }, [
+    uniqueExerciseIds,
     workoutsForMuscleVolume,
-    exerciseToMuscleVolume,
-    disableFractionalVolume,
-    mustBeGeEqThresh,
     filterWarmups,
+    mustBeGeEqThresh,
+    disableFractionalVolume
   ]);
+
+  useEffect(() => {
+    void fetchMuscleVolumeForGivenWorkout();
+    return CACHE_FACTORY.subscribe((e) => {
+      if (e.cacheName === EXERCISE_MUSCLE_CACHE_NAME) {
+        void fetchMuscleVolumeForGivenWorkout();
+      }
+    });
+  }, [fetchMuscleVolumeForGivenWorkout]);
 
   const barData = MUSCLE_GROUPS.map((mg) => {
     const display = muscleGroupsToRow.get(mg)?.display_name ?? mg;
@@ -172,8 +188,8 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
         b[1].numSets * b[1].volumeFactor - a[1].numSets * a[1].volumeFactor,
     );
     let volume = muscleVolumes[mg] ?? 0;
-    if (showAsNDayAverage) {
-      volume /= showAsNDayAverage;
+    if (showAsNDayAverage && numDaysSpanned > 0) {
+      volume = (volume / numDaysSpanned) * showAsNDayAverage;
     }
     return {
       value: Math.round(volume * 10) / 10,
@@ -225,52 +241,30 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
               gap: spacing.sm,
             }}
           >
-            <Text style={typography.body}>N-Day Average:</Text>
+            <Text style={typography.body}>Show as Trend:</Text>
             <ModalPicker
-              title="Show as N-Day Average"
-              help="Averages the volumes over N days. For example, to get your weekly average set N=7. N cannot be set greater than the number of days."
-              options={[
-                null,
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                20,
-                25,
-                30,
-                60,
-                90,
-                120,
-                200,
-                300,
-                365,
-              ]
-                .filter((n) => n === null || n <= workoutsDaysSpan)
-                .map((n) => {
-                  return {
-                    label: n === null ? "None" : n.toString(),
-                    value: n,
-                  };
-                })}
+              title="Show as Trend"
+              help="Scales your recent average volume to show trends over different time periods (e.g., weekly trend from the last 30 days, daily trend from the last 7 days). Formula used is: (total volume ÷ days in range) × trend period."
+              options={([null, 'Daily', 'Weekly', 'Monthly', 'Yearly'] as const).map((n) => {
+                return {
+                  label: n === null ? "None" : n,
+                  value: n,
+                };
+              })}
               onChange={(value) => {
                 if (value === null) {
                   setShowAsNDayAverage(value);
-                } else if (value <= workoutsDaysSpan) {
-                  setShowAsNDayAverage(value);
+                } else if (value === 'Daily') {
+                  setShowAsNDayAverage(1);
+                } else if (value === 'Weekly') {
+                  setShowAsNDayAverage(7);
+                } else if (value === 'Monthly') {
+                  setShowAsNDayAverage(30);
+                } else if (value === 'Yearly') {
+                  setShowAsNDayAverage(365);
                 }
               }}
-              value={showAsNDayAverage}
+              value={showAsNDayAverage === null ? null : daysToLabel(showAsNDayAverage)}
               pressableProps={{
                 style: { alignSelf: "flex-start", padding: spacing.padding_sm },
               }}
@@ -357,86 +351,6 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
                 }}
               />
             </View>
-            {workoutsDaysSpan >= 7 && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing.xs,
-                }}
-              >
-                <Selection
-                  title={"Weekly Avg"}
-                  isSelected={
-                    disableFractionalVolume === false &&
-                    filterWarmups === true &&
-                    showAsNDayAverage === 7 &&
-                    mustBeGeEqThresh === null
-                  }
-                  onPress={() => {
-                    setDisableFractionalVolume(false);
-                    setFilterWarmups(true);
-                    setShowAsNDayAverage(7);
-                    setMustBeGeEqThresh(null);
-                  }}
-                />
-                <Selection
-                  title={"Weekly Avg No Fracs"}
-                  isSelected={
-                    disableFractionalVolume === true &&
-                    filterWarmups === true &&
-                    showAsNDayAverage === 7 &&
-                    mustBeGeEqThresh === 0.5
-                  }
-                  onPress={() => {
-                    setDisableFractionalVolume(true);
-                    setFilterWarmups(true);
-                    setShowAsNDayAverage(7);
-                    setMustBeGeEqThresh(0.5);
-                  }}
-                />
-              </View>
-            )}
-            {workoutsDaysSpan >= 30 && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing.xs,
-                }}
-              >
-                <Selection
-                  title={"Monthly Avg"}
-                  isSelected={
-                    disableFractionalVolume === false &&
-                    filterWarmups === true &&
-                    showAsNDayAverage === 30 &&
-                    mustBeGeEqThresh === null
-                  }
-                  onPress={() => {
-                    setDisableFractionalVolume(false);
-                    setFilterWarmups(true);
-                    setShowAsNDayAverage(30);
-                    setMustBeGeEqThresh(null);
-                  }}
-                />
-                <Selection
-                  title={"Weekly Avg No Fracs"}
-                  isSelected={
-                    disableFractionalVolume === true &&
-                    filterWarmups === true &&
-                    showAsNDayAverage === 30 &&
-                    mustBeGeEqThresh === 0.5
-                  }
-                  onPress={() => {
-                    setDisableFractionalVolume(true);
-                    setFilterWarmups(true);
-                    setShowAsNDayAverage(30);
-                    setMustBeGeEqThresh(0.5);
-                  }}
-                />
-              </View>
-            )}
           </View>
         </View>
       )}
@@ -537,7 +451,7 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
                     {conFac.toFixed(1)} Set{conFac === 1 ? "" : "s"}
                   </Text>
                 </View>
-                {showAsNDayAverage && (
+                {showAsNDayAverage && numDaysSpanned > 0 && (
                   <View style={{ flexDirection: "row" }}>
                     <Text
                       style={{
@@ -545,7 +459,7 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
                         alignSelf: "flex-start",
                       }}
                     >
-                      Averaging Over {showAsNDayAverage}
+                      {showAsNDayAverage} Day Average
                     </Text>
                     <Text style={{ ...typography.body, fontWeight: "700" }}>
                       &rarr;
@@ -553,10 +467,9 @@ export function Volumes<M extends WorkoutEditorMode>(props: VolumesProps<M>) {
                     <Text
                       style={{ ...styles.highlightedText, fontWeight: "700" }}
                     >
-                      {(conFac / showAsNDayAverage).toFixed(2)} Set
-                      {conFac / showAsNDayAverage === 1 ? "" : "s"} /{" "}
-                      {showAsNDayAverage} Day
-                      {showAsNDayAverage === 1 ? "" : "s"}
+                      {(conFac / numDaysSpanned * showAsNDayAverage).toFixed(2)} Set
+                      {conFac / numDaysSpanned * showAsNDayAverage === 1 ? "" : "s"} /{" "}
+                      {daysToLabel(showAsNDayAverage)}
                     </Text>
                   </View>
                 )}

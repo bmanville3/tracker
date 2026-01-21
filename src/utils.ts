@@ -215,6 +215,14 @@ export function fromISODate(d: ISODate): Date {
   return new Date(year, month - 1, day);
 }
 
+export function daysBetweenDates(date1: ISODate, date2: ISODate): number {
+  const d1 = new Date(date1 + "T00:00:00Z");
+  const d2 = new Date(date2 + "T00:00:00Z");
+
+  const diffMs = Math.abs(d2.getTime() - d1.getTime());
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}
+
 export function arraysEqual<T>(
   a: readonly T[],
   b: readonly T[],

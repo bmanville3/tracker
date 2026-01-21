@@ -4,8 +4,9 @@ import { MuscleGroupRow } from "../types";
 import { MuscleGroup } from "../types/enums";
 import { showAlert } from "../utils";
 
+export const MUSCLE_CACHE_NAME = "muscleCache";
 const MUSCLE_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<MuscleGroupRow>(
-  "muscleCache",
+  MUSCLE_CACHE_NAME,
   null,
 );
 

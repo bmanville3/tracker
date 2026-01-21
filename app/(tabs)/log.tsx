@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,7 @@ import {
 import {
   deleteWorkoutLog,
   fetchLastNWorkoutLogs,
+  FULL_WORKOUT_LOG_CACHE_NAME,
 } from "@/src/api/workoutLogApi";
 import { FullAttachedWorkout, FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
 import { Button, ClosableModal, Screen } from "@/src/components";
@@ -20,6 +21,7 @@ import { colors, spacing, typography } from "@/src/theme";
 import { UUID } from "@/src/types";
 import { anyErrorToString, showAlert } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
+import { CACHE_FACTORY } from "@/src/swrCache";
 
 export default function WorkoutLogIndex() {
   // WorkoutView modal-ish state
@@ -36,33 +38,33 @@ export default function WorkoutLogIndex() {
     FullAttachedWorkout<'log'>[]
   >([]);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  const reloadWorkouts = async () => {
-    const last30 = await fetchLastNWorkoutLogs(30);
-    setDisplayedWorkouts(last30);
-  };
+  const reloadWorkouts = useCallback(async () => {
+    setLoading(true);
+    setErrorText(null);
+    try {
+      const last30 = await fetchLastNWorkoutLogs(30);
+      setDisplayedWorkouts(last30);
+    } catch (e: any) {
+      setErrorText(anyErrorToString(e, "Failed to load workouts"));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setErrorText(null);
-        setFromWorkout(null);
-        setWorkoutViewIsActive(false);
-        setUpdateId(null);
-        setConfirmDelete(null);
-        setAllowEdit(false);
-
-        await reloadWorkouts();
-      } catch (e: any) {
-        setErrorText(anyErrorToString(e, "Failed to load workouts"));
-      } finally {
-        setLoading(false);
-      }
-    })();
+    reloadWorkouts(); // load on entry
   }, []);
+
+  useEffect(() => {
+    return CACHE_FACTORY.subscribe((e) => {
+      if (e.cacheName === FULL_WORKOUT_LOG_CACHE_NAME) {
+        reloadWorkouts();  
+      }
+    })
+  }, [reloadWorkouts]);
 
   const previewByWorkoutId: Record<UUID, string> = useMemo(() => {
     const previews: Record<UUID, string> = {};
@@ -116,7 +118,7 @@ export default function WorkoutLogIndex() {
     return (
       <WorkoutView
         isActive={workoutViewIsActive}
-        onSuccessfulSave={reloadWorkouts}
+        onSuccessfulSave={() => {}} // will be automatically done by cache subscription
         requestClose={() => setWorkoutViewIsActive(false)}
         allowEditing={allowEdit}
         loadWithExisting={fromWorkout}
@@ -275,11 +277,6 @@ export default function WorkoutLogIndex() {
             setLoading(true);
             deleteWorkoutLog(confirmDelete.workoutId)
               .then(() => {
-                setDisplayedWorkouts(
-                  displayedWorkouts.filter(
-                    (f) => f.workoutId !== confirmDelete.workoutId,
-                  ),
-                );
                 showAlert("Log successfully deleted");
               })
               .catch((e) =>
