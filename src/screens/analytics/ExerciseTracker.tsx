@@ -1,14 +1,14 @@
 import { EditableExercise, EditableSet, FullAttachedWorkout, isFullAttachedLogWorkouts, WorkoutEditorMode } from "@/src/api/workoutSharedApi";
-import { Button, ModalPicker, Selection } from "@/src/components";
+import { Button, ClosableModal, ModalPicker, Selection } from "@/src/components";
 import { colors, spacing, typography } from "@/src/theme";
 import { EXERCISE_AND_MUSCLE_TAGS, ExerciseAndMuscleTag, ExerciseRow, ISODate, UUID } from "@/src/types";
+import { capitalizeFirstLetter, isSubsetOfArray, maxNullable } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { LineChart, lineDataItem } from "react-native-gifted-charts";
+import { LineChart } from "react-native-gifted-charts";
 import { ExerciseModal } from "../exercise/ExerciseModal";
 import { RPE_TABLE_MODE_TO_E1RM_FUNCTION, RPE_TABLE_MODES, RpeTableMode } from "../RPEChart";
-import { capitalizeFirstLetter, isSubsetOfArray, maxNullable } from "@/src/utils";
 
 function e1rmForSetLog(args: {
   ss: EditableSet<'log'>;
@@ -46,7 +46,7 @@ type VolumeSettings = {
 };
 
 type GroupSettings = {
-  exercises: ExerciseRow[];
+  exercises: Map<UUID, ExerciseRow>;
   tagsToLookAt: ExerciseAndMuscleTag[];
   trackAsSingularUnit: boolean;
   includeRawGraph: boolean;
@@ -54,6 +54,7 @@ type GroupSettings = {
   includeVolumeGraph: boolean;
   e1RMFormula: RpeTableMode;
   volume: VolumeSettings;
+  displayGroup: boolean;
 };
 
 type DataToGraph = {
@@ -63,7 +64,7 @@ type DataToGraph = {
 }
 
 const DEFAULT_GROUP: GroupSettings = {
-  exercises: [],
+  exercises: new Map(),
   tagsToLookAt: [],
   trackAsSingularUnit: false,
   includeRawGraph: false,
@@ -76,6 +77,7 @@ const DEFAULT_GROUP: GroupSettings = {
     rollingAverage: 0.75,
     filterWarmups: true,
   },
+  displayGroup: false,
 };
 
 // this function is here to make sure the backing arrays are not shared
@@ -84,7 +86,7 @@ const DEFAULT_GROUP: GroupSettings = {
 function cloneGroup(g: GroupSettings): GroupSettings {
   return {
     ...g,
-    exercises: [...g.exercises],
+    exercises: new Map(g.exercises),
     tagsToLookAt: [...g.tagsToLookAt],
     volume: { ...g.volume },
   };
@@ -101,14 +103,13 @@ function cloneGroup(g: GroupSettings): GroupSettings {
  */
 function extractDataToGraph(settings: GroupSettings, workouts: FullAttachedWorkout<'log'>[]): Map<ISODate, Map<UUID, DataToGraph>> {
   const finalMapping: Map<ISODate, Map<UUID, DataToGraph>> = new Map();
-  const exerciseIds = new Set(settings.exercises.map(e => e.id));
   workouts.forEach((workout) => {
     const dataForExercisesInThisWorkout = new Map<UUID, DataToGraph>();
   
     workout.exercises.forEach((exercise, i) => {
       const exId = exercise.exercise.id;
       // not tracking exercise
-      if (!exerciseIds.has(exId)) return;
+      if (!settings.exercises.has(exId)) return;
       // get the data for the exercise. Should be undefined if not seen or present if seen WITH sets
       let data = dataForExercisesInThisWorkout.get(exId);
 
@@ -175,21 +176,30 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
   // exercise picker
   const [exerciseModalVisible, setExerciseModalVisible] = useState<boolean>(false);
   const [exerciseModalFn, setExerciseModalFn] = useState<((exercise: ExerciseRow) => void) | null>(null);
+  const [exerciseModalIdLimiter, setExerciseModalIdLimiter] = useState<Set<UUID>>(new Set());
 
   // all groups
+  const [seeAllExercises, setSeeAllExercises] = useState<boolean>(false);
+  const [filterAllExercisesByTags, setFilterAllExercisesByTags] = useState<ExerciseAndMuscleTag[]>([]);
+  const [showGroupsToAddTo, setShowGroupsToAddTo] = useState<boolean>(false);
   const [applyNormalization, setApplyNormalization] = useState<boolean>(false);
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<number | null>(null);
+  const [confirmDeleteAllGroups, setConfirmDeleteAllGroups] = useState<boolean>(false);
 
   const [groups, setGroups] = useState<GroupSettings[]>([]);
 
   const isLogWorkouts = isFullAttachedLogWorkouts(trackOverWorkouts);
 
+  const allExerciseInWorkout: Map<UUID, ExerciseRow> = new Map();
+  trackOverWorkouts.forEach(w => w.exercises.forEach(e => allExerciseInWorkout.set(e.exercise.id, e.exercise)));
+  const allExerciseIdsInWorkouts = [...new Set(allExerciseInWorkout.keys())];
+
   const reduceWorkoutsForGroup = (i: number) => {
     const group = groups[i];
-    const ids = new Set(group.exercises.map(ex => ex.id));
     return trackOverWorkouts
-      .filter(w => w.exercises.some(ex => ids.has(ex.exercise.id)))
+      .filter(w => w.exercises.some(ex => group.exercises.has(ex.exercise.id)))
       .map(w => {
-        const fitleredWithIndex = w.exercises.map((ex, i) => [ex, i] satisfies [EditableExercise<WorkoutEditorMode>, number]).filter(([ex, _i]) => ids.has(ex.exercise.id));
+        const fitleredWithIndex = w.exercises.map((ex, i) => [ex, i] satisfies [EditableExercise<WorkoutEditorMode>, number]).filter(([ex, _i]) => group.exercises.has(ex.exercise.id));
         const newExercises = fitleredWithIndex.map(([ex, _i]) => ex);
         const newSets = fitleredWithIndex.map(([_ex, i]) => w.sets[i])
         return {workout: w.workout, exercises: newExercises, sets: newSets, workoutId: w.workoutId} satisfies FullAttachedWorkout<WorkoutEditorMode>;
@@ -213,7 +223,12 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
   }
 
   function copyGroup(i: number) {
-    setGroups((prev) => [...prev, cloneGroup(prev[i])]);
+    updateGroup(i, {displayGroup: false});
+    setGroups((prev) => {
+      const cloned = cloneGroup(prev[i]);
+      const {volume, displayGroup, ...rest} = cloned
+      return [...prev, {...rest, displayGroup: true, volume: {...volume, showAdvanced: true }}]
+    });
   }
 
   function addGroup() {
@@ -265,14 +280,14 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
       const next = [...prev];
       const g = next[i];
 
-      const existing = new Set(g.exercises.map(e => e.id));
-      const additions = exercises.filter(e => !existing.has(e.id));
-
-      if (additions.length === 0) return prev;
+      const newExercises = new Map(g.exercises);
+      for (const ex of exercises) {
+        newExercises.set(ex.id, ex);
+      }
 
       next[i] = {
         ...g,
-        exercises: [...g.exercises, ...additions],
+        exercises: newExercises,
       };
       return next;
     });
@@ -287,32 +302,39 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
       const next = [...prev];
       const g = next[i];
 
-      const filtered = g.exercises.filter(ex => !idsToRemove.has(ex.id));
-      if (filtered.length === g.exercises.length) return prev;
+      const newMap = new Map(g.exercises);
 
-      next[i] = { ...g, exercises: filtered };
+      for (const ex of exercises) {
+        newMap.delete(ex.id);
+      }
+
+      next[i] = { ...g, exercises: newMap };
       return next;
     });
   }
   
   const renderGroupExercises = (group: GroupSettings, groupIndex: number) => {
     return <View>
-      <Button
-        title={`Add Exercise`}
-        onPress={() => {
-          setExerciseModalFn(() => (ex: ExerciseRow) => {
-            addExercisesToGroup(groupIndex, [ex]);
-          })
-          setExerciseModalVisible(true);
-        }}
-        {...styles.smallButton}
-      />
-      {group.exercises.map((ex) => {
-        return <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.fadedPrimary, borderColor: colors.border, borderWidth: 1, alignSelf: 'flex-start', borderRadius: 10, padding: spacing.padding_xs, margin: spacing.xxs }}>
+      <View style={{ flexDirection: 'row', gap: spacing.xs, alignItems: 'center' }}>
+        <Button
+          title={'Add Exercise'}
+          onPress={() => {
+            setExerciseModalFn(() => (ex: ExerciseRow) => {
+              addExercisesToGroup(groupIndex, [ex]);
+            })
+            setExerciseModalIdLimiter(new Set(allExerciseIdsInWorkouts.filter(exId => !group.exercises.has(exId))));
+            setExerciseModalVisible(true);
+          }}
+          {...styles.smallButton}
+        />
+        <Text style={typography.hint}>({allExerciseIdsInWorkouts.filter(id => !group.exercises.has(id)).length} exercises left to add)</Text>
+      </View>
+      {group.exercises.size > 0 ? [...group.exercises.values()].map((ex) => {
+        return <View key={ex.id} style={styles.exercisePill}>
           <Text>{ex.name}</Text>
           <Feather name={'x'} onPress={() => removeExercisesFromGroup(groupIndex, [ex])}/>
         </View>
-      })}
+      }) : <Text style={{...typography.label, marginLeft: spacing.sm}}>No exercises in Group {groupIndex + 1} yet</Text>}
     </View>
   }
 
@@ -358,6 +380,7 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
           <View style={{ flexDirection: 'row', gap: spacing.xs }}>
             {EXERCISE_AND_MUSCLE_TAGS.map(t => {
               return <Selection
+                key={t}
                 title={capitalizeFirstLetter(t)}
                 isSelected={group.tagsToLookAt.includes(t)}
                 onPress={() => {
@@ -371,20 +394,30 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
               />
             })}
           </View>
+          <Text style={typography.hint}>{new Set(trackOverWorkouts.flatMap(w => w.exercises.filter(e => isSubsetOfArray(group.tagsToLookAt, e.exercise.tags)).map(e => e.exercise.id))).size} exercises have all selected tags
+          </Text>
         </View>
-        <View style={styles.containerStyle}>
+        <View style={{...styles.containerStyle, flexDirection: 'row', alignItems: 'center', gap:spacing.sm}}>
           <Selection
             title={"Filter Warmups"}
             isSelected={volume.filterWarmups}
             onPress={() => updateGroupVolume(groupIndex, {filterWarmups: !volume.filterWarmups})}
             style={{ alignSelf: "flex-start" }}
           />
+          <Text style={typography.hint}>{trackOverWorkouts.map(w =>
+            w.sets.map(
+              s => s.map(
+                ss => (ss.set_type === 'warmup' ? 1 : 0) as number
+              ).reduce((a, b) => a + b, 0)
+            ).reduce((a, b) => a + b, 0)
+          ).reduce((a, b) => a + b, 0)} Sets of Warmups Exist</Text>
         </View>
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
             ...styles.containerStyle,
+            gap: spacing.sm,
           }}
         >
           <Text style={typography.body}>Set e1RM Formula:</Text>
@@ -402,13 +435,14 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
           style={{
             flexDirection: "row",
             alignItems: "center",
-            ...styles.containerStyle
+            ...styles.containerStyle,
+            gap: spacing.sm,
           }}
         >
           <Selection
             title={"Use Rolling Average"} 
             isSelected={volume.useRollingAverage}
-            onPress={() => updateGroupVolume(groupIndex, {useRollingAverage: volume.useRollingAverage})}
+            onPress={() => updateGroupVolume(groupIndex, {useRollingAverage: !volume.useRollingAverage})}
           />
           {volume.useRollingAverage && (<>
             <Feather name="minus-circle" size={22} onPress={() => {
@@ -425,22 +459,24 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
   }
 
   const renderFullGroupMetadata = (group: GroupSettings, groupIndex: number) => {
-    return <View>
-      <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-        <Text>Group {groupIndex + 1}</Text>
-        <Feather name="trash" onPress={() => deleteGroup(groupIndex)}/>
+    return <View style={{ marginBottom: spacing.sm }}>
+      <View style={{ ...styles.containerStyle, flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+        <Text style={typography.subsection}>Group {groupIndex + 1}</Text>
+        <Feather
+          name={
+            group.displayGroup ? "arrow-up-circle" : "arrow-down-circle"
+          }
+          size={22}
+          onPress={() => updateGroup(groupIndex, {displayGroup: !group.displayGroup})}
+        />
+        <Feather style={{...typography.body, marginLeft: 'auto'}} name="copy" size={22} onPress={() => copyGroup(groupIndex)}/>
+        <Feather style={{...typography.body, marginLeft: spacing.xs}} name="trash" size={22} onPress={() => setConfirmDeleteGroup(groupIndex)}/>
       </View>
-      {renderGroupExercises(group, groupIndex)}
-      {renderGroupDropdown(group, groupIndex)}
+      {group.displayGroup && <View style={{marginTop: spacing.md, ...styles.containerStyle, backgroundColor: colors.bg}}>
+        {renderGroupDropdown(group, groupIndex)}
+        {renderGroupExercises(group, groupIndex)}
+      </View>}
     </View>
-  }
-
-  const renderAddGroup = () => {
-    return <Button
-      title={"New Group"}
-      onPress={addGroup}
-      {...styles.smallButton}
-    />
   }
 
   const renderAllGroupsGraphData = () => {
@@ -467,9 +503,86 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
     </ScrollView>
   }
 
+  const renderWorkoutsMetadata = () => {
+    const allExerciseInWorkoutFiltered = [...allExerciseInWorkout.values()].filter(e => isSubsetOfArray(filterAllExercisesByTags, e.tags));
+    return <View>
+      <View style={{ ...styles.containerStyle, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm}}>
+        <Text style={{...typography.body}}>Tracking over {trackOverWorkouts.length} workout</Text>
+        <Text style={{...typography.body, marginLeft: 'auto'}}>See All Exercises</Text>
+        <Feather
+          name={
+            seeAllExercises ? "arrow-up-circle" : "arrow-down-circle"
+          }
+          size={18}
+          onPress={() => setSeeAllExercises((prev) => !prev)}
+        />
+      </View>
+      {seeAllExercises && <View style={{ marginTop: spacing.sm, marginBottom: spacing.sm, gap: spacing.xs}}>
+        <Text style={typography.hint}>Filter by tags (Must include all tags):</Text>
+        <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+          {EXERCISE_AND_MUSCLE_TAGS.map(t => {
+            return <Selection
+              key={t}
+              title={capitalizeFirstLetter(t)}
+              isSelected={filterAllExercisesByTags.includes(t)}
+              onPress={() => {
+                if (filterAllExercisesByTags.includes(t)) {
+                  setFilterAllExercisesByTags((prev) => prev.filter(tag => tag !== t));
+                } else {
+                  setFilterAllExercisesByTags((prev) => [...prev, t]);
+                }
+              }}
+              {...styles.smallButton}
+            />
+          })}
+        </View>
+        {groups.length > 0 && <Selection
+          title={"Show Groups to Add Exercises To"}
+          isSelected={showGroupsToAddTo}
+          onPress={() => setShowGroupsToAddTo((prev) => !prev)}
+          style={{ alignSelf: 'flex-start' }}
+          textProps={{ style: {...typography.body, padding: spacing.padding_sm} }}
+        />}
+      </View>}
+      {seeAllExercises && (
+        allExerciseInWorkoutFiltered.length > 0 ? allExerciseInWorkoutFiltered.map((ex) => {
+          return <View key={ex.id} style={{...styles.exercisePill, flexDirection: 'column', padding: spacing.padding_sm, alignItems: undefined}}>
+            <Text style={typography.body}>{ex.name}</Text>
+            {showGroupsToAddTo && groups.length > 0 && <View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
+              {groups.map((g, gI) => {
+                if (g.exercises.has(ex.id)) {
+                  return null;
+                } else {
+                  return <Button
+                    key={`${ex.id}-${gI}`}
+                    title={`Add to Group ${gI + 1}`}
+                    onPress={() => addExercisesToGroup(gI, [ex])}
+                    {...styles.smallButton}
+                  />
+                }
+              })}
+            </View>}
+          </View>
+        }) : <Text>No Exercises in Tracked Workouts with Selected Tags</Text>
+      )}
+    </View>
+  }
+
   return <View>
-    {renderAddGroup()}
+    {renderWorkoutsMetadata()}
+    <Button
+      title={"New Group"}
+      onPress={addGroup}
+      variant="secondary"
+      style={{ marginBottom: spacing.md, marginTop: spacing.md }}
+    />
     {groups.map(renderFullGroupMetadata)}
+    {groups.length > 0 && <Button
+      title="Remove All Groups"
+      onPress={() => setConfirmDeleteAllGroups(true)}
+      style={{ marginTop: spacing.md, marginBottom: spacing.md, padding: spacing.padding_sm, alignSelf: 'flex-end' }}
+      variant="revert"
+    />}
     {renderAllGroupsGraphData()}
     <ExerciseModal
       visible={exerciseModalVisible}
@@ -479,12 +592,47 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
         }
         setExerciseModalVisible(false);
         setExerciseModalFn(null);
+        setExerciseModalIdLimiter(new Set());
       }}
       allowSelectExercises={true}
       allowCreateExercises={false}
       allowDeleteExercises={false}
       allowEditExercises={false}
+      limitToExercisesIds={exerciseModalIdLimiter}
     />
+    <ClosableModal visible={confirmDeleteGroup !== null} onRequestClose={() => setConfirmDeleteGroup(null)}>
+      <Text style={{...typography.title, borderBottomColor: colors.border, borderBottomWidth: 2, marginBottom: spacing.sm}}>Delete Group {confirmDeleteGroup !== null ? confirmDeleteGroup + 1 : 'n/a'}?</Text>
+      <Button
+        title={`Delete Group ${confirmDeleteGroup !== null ? confirmDeleteGroup + 1 : 'n/a'}`}
+        onPress={() => {
+          if (confirmDeleteGroup === null) {
+            return;
+          }
+          deleteGroup(confirmDeleteGroup);
+          setConfirmDeleteGroup(null);
+        }}
+        variant="revert"
+      />
+      <Button
+        title="Cancel"
+        onPress={() => setConfirmDeleteGroup(null)}
+      />
+    </ClosableModal>
+    <ClosableModal visible={confirmDeleteAllGroups} onRequestClose={() => setConfirmDeleteAllGroups(false)}>
+      <Text style={{...typography.title, borderBottomColor: colors.border, borderBottomWidth: 2, marginBottom: spacing.sm}}>Delete All Groups?</Text>
+      <Button
+        title={'Delete All Groups'}
+        onPress={() => {
+          setGroups([]);
+          setConfirmDeleteAllGroups(false);
+        }}
+        variant="revert"
+      />
+      <Button
+        title="Cancel"
+        onPress={() => setConfirmDeleteAllGroups(false)}
+      />
+    </ClosableModal>
   </View>;
 }
 
@@ -493,6 +641,7 @@ const styles = {
     style: {
       alignSelf: 'flex-start',
       padding: spacing.padding_sm,
+      marginLeft: 0,
     },
     textProps: {
       style: {
@@ -500,5 +649,6 @@ const styles = {
       },
     },
   },
+  exercisePill: {flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.fadedPrimary, borderColor: colors.border, borderWidth: 1, alignSelf: 'flex-start', borderRadius: 10, padding: spacing.padding_xs, margin: spacing.xxs},
   containerStyle: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, padding: spacing.padding_md, borderRadius: 10, rowGap: spacing.xs },
 } as const;

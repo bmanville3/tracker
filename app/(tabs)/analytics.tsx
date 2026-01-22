@@ -1,7 +1,6 @@
-import { fetchWorkoutLogsInRange, fetchWorkoutLogsOnOrAfterDate, FULL_WORKOUT_LOG_CACHE_NAME, WORKOUT_LOG_HEADER_CACHE_NAME } from "@/src/api/workoutLogApi";
+import { fetchWorkoutLogsInRange, fetchWorkoutLogsOnOrAfterDate, FULL_WORKOUT_LOG_CACHE_NAME } from "@/src/api/workoutLogApi";
 import { FullAttachedWorkout } from "@/src/api/workoutSharedApi";
 import {
-  Button,
   ModalPicker,
   Screen
 } from "@/src/components";
@@ -11,8 +10,7 @@ import { Volumes } from "@/src/screens/analytics/Volumes";
 import { CACHE_FACTORY } from "@/src/swrCache";
 import { colors, spacing, typography } from "@/src/theme";
 import { ISODate } from "@/src/types";
-import { requireGetUser, showAlert, toISODate } from "@/src/utils";
-import { Feather } from "@expo/vector-icons";
+import { showAlert, toISODate } from "@/src/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -185,13 +183,6 @@ export default function Analytics() {
         >
           <Text style={typography.hint}>{endDate}</Text>
         </Pressable>
-        <Button
-          title={"Recompute"}
-          style={{ alignSelf: 'flex-start', padding: spacing.padding_sm }}
-          textProps={{ style: {fontSize: typography.body.fontSize} }}
-          onPress={fetchWorkoutsForExercises}
-          disabled={initStart.current === startDate && initEnd.current === endDate || isFetchingWorkoutsForExercise}
-        />
       </View>
       {isFetchingWorkoutsForExercise ? <ActivityIndicator/> : <ExerciseTracker
         trackOverWorkouts={workoutsForExercises}

@@ -13,6 +13,7 @@ import {
   EXERCISE_AND_MUSCLE_TAGS,
   ExerciseAndMuscleTag,
   ExerciseRow,
+  UUID,
 } from "@/src/types";
 import {
   anyErrorToString,
@@ -36,6 +37,8 @@ type ExerciseModalProps = {
   allowSelectExercises?: boolean;
   /** If true, automatically close the modal after selecting an exercise */
   autoCloseOnSelect?: boolean;
+
+  limitToExercisesIds?: Set<UUID> | null;
 };
 
 export function ExerciseModal(props: ExerciseModalProps) {
@@ -47,6 +50,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
     allowEditExercises = false,
     allowCreateExercises = false,
     allowSelectExercises = false,
+    limitToExercisesIds = null,
   } = props;
 
   const [selection, setSelection] = useState<ExerciseRow | null>(null);
@@ -95,7 +99,7 @@ export function ExerciseModal(props: ExerciseModalProps) {
     setLoadingExercises(true);
     setExerciseError(null);
     try {
-      const xs = await searchExercises(trimmed, tags);
+      const xs = await searchExercises(trimmed, tags, limitToExercisesIds);
       xs.sort((a, b) => a.name.localeCompare(b.name));
       if (byUser) {
         setExercises(xs.filter((ex) => ex.created_by_user !== null));
@@ -114,13 +118,13 @@ export function ExerciseModal(props: ExerciseModalProps) {
     setExerciseError(null);
     try {
       let xs: ExerciseRow[] = [];
-      [...(await searchExercises("Squat")).values()]
+      [...(await searchExercises("Squat", null, limitToExercisesIds)).values()]
         .slice(0, 3)
         .forEach((er) => xs.push(er));
-      [...(await searchExercises("Bench")).values()]
+      [...(await searchExercises("Bench", null, limitToExercisesIds)).values()]
         .slice(0, 3)
         .forEach((er) => xs.push(er));
-      [...(await searchExercises("Deadlift")).values()]
+      [...(await searchExercises("Deadlift", null, limitToExercisesIds)).values()]
         .slice(0, 3)
         .forEach((er) => xs.push(er));
       xs = [...new Map(xs.map((er) => [er.id, er])).values()];
