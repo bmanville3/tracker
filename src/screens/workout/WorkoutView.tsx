@@ -1,12 +1,13 @@
+import { EXERCISE_CACHE_NAME, fetchExercises } from "@/src/api/exerciseApi";
 import { upsertWorkoutLog } from "@/src/api/workoutLogApi";
 import {
-  AnyEditableSet,
+  addExerciseToWorkout,
+  addSetToWorkout,
   EditableExercise,
-  editableExerciseEqual,
   EditableSet,
-  editableSetEqual,
   EditableWorkout,
-  editableWorkoutEqual,
+  FullAttachedWorkout,
+  fullDetachedWorkoutEqual,
   FullDetachedWorkoutForMode,
   isFullDetachedLogWorkout,
   isFullDetachedTemplateWorkout,
@@ -14,8 +15,14 @@ import {
   isLogWorkout,
   isTemplateSet,
   isTemplateWorkout,
+  removeExerciseFromWorkoutById,
+  removeExerciseFromWorkoutByIndex,
+  swapExercisesInWorkout,
+  updateExerciseForWorkout,
+  updateExercisesForWorkoutWhere,
+  updateWorkoutInWorkout,
   WorkoutEditorMode,
-  workoutHasProgram,
+  workoutHasProgram
 } from "@/src/api/workoutSharedApi";
 import { upsertTemplateWorkout } from "@/src/api/workoutTemplateApi";
 import {
@@ -27,58 +34,43 @@ import {
   TextField,
 } from "@/src/components/";
 import { rpeChartE1RM } from "@/src/screens/RPEChart";
+import { CACHE_FACTORY } from "@/src/swrCache";
 import { colors, spacing, typography } from "@/src/theme";
 import { DistanceUnit, ExerciseRow, UUID, WeightUnit } from "@/src/types";
 import {
   anyErrorToString,
-  arraysEqual,
   changeWeightUnit,
-  doubleArraysEqual,
-  requireGetUser,
-  showAlert,
+  showAlert
 } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { ExerciseModal } from "../exercise/ExerciseModal";
 import { VolumeRender } from "../exercise/VolumeRender";
-import { CACHE_FACTORY } from "@/src/swrCache";
-import { EXERCISE_CACHE_NAME, fetchExercises } from "@/src/api/exerciseApi";
 
-export type SetRenderProps<M extends WorkoutEditorMode> = {
-  set: EditableSet<M>;
-  setIndex: number;
-  handleUpdateSetCurried: <K extends keyof EditableSet<M>>(
-    key: K,
-    value: EditableSet<M>[K],
-  ) => void;
+export type SharedProps<M extends WorkoutEditorMode> = {
+  setFullWorkout: React.Dispatch<React.SetStateAction<FullDetachedWorkoutForMode<M>>>;
   isLoading: boolean;
   allowEditing: boolean;
+}
+
+export type SetRenderProps<M extends WorkoutEditorMode> = SharedProps<M> & {
+  set: EditableSet<M>;
+  setIndex: number;
+  exerciseIndex: number;
 };
 
 export type AdvancedSetRenderProps<M extends WorkoutEditorMode> =
   SetRenderProps<M> & {
     exercise: EditableExercise<M>;
-    exerciseIndex: number;
     totalSetsInExercise: number;
-    handleSwapSetsInExercise: (
-      exerciseIdx: number,
-      setIdx1: number,
-      setIdx2: number,
-    ) => void;
-    handleRemoveSetInExercise: (exerciseIdx: number, setIdx: number) => void;
     isVisible: boolean;
     onRequestClose: () => void;
+    setAdvancedSet: React.Dispatch<React.SetStateAction<[number, number] | null>>;
   };
 
-export type HeaderSubFieldsProps<M extends WorkoutEditorMode> = {
+export type HeaderSubFieldsProps<M extends WorkoutEditorMode> = SharedProps<M> & {
   workout: EditableWorkout<M>;
-  allowEditing: boolean;
-  isLoading: boolean;
-  handleUpdateWorkout: <K extends keyof EditableWorkout<M>>(
-    key: K,
-    value: EditableWorkout<M>[K],
-  ) => void;
   openDatePicker: boolean;
   setOpenDatePicker: (o: boolean) => void;
   newSetWeightUnit: WeightUnit;
@@ -123,10 +115,7 @@ export type WorkoutViewProps<M extends WorkoutEditorMode> = {
    * This function should be ignore ONLY if requestCloseOnSuccessfulSave=True.
    * Otherwise it might have odd side effects if `loadWithExisting` and `updateWorkoutId` are not properly changed.
    */
-  onSuccessfulSave: (
-    newWorkout: FullDetachedWorkoutForMode<M>,
-    newId: UUID,
-  ) => void;
+  onSuccessfulSave: (newWorkout: FullAttachedWorkout<M>) => void;
   strategy: WorkoutEditorModeStrategy<M>;
   loadWithExisting?: FullDetachedWorkoutForMode<M> | null;
   updateWorkoutId?: UUID | null;
@@ -150,15 +139,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const [workout, setWorkout] = useState<EditableWorkout<M>>(
-    loadWithExisting?.workout ?? strategy.createEmptyWorkout(),
-  );
-  const [exercises, setExercises] = useState<EditableExercise<M>[]>(
-    loadWithExisting?.exercises ?? [],
-  );
-  const [sets, setSets] = useState<EditableSet<M>[][]>(
-    loadWithExisting?.sets ?? [],
-  );
+  const [fullWorkout, setFullWorkout] = useState<FullDetachedWorkoutForMode<M>>(structuredClone(loadWithExisting) ?? blankState(strategy));
 
   const [newSetWeightUnit, setNewSetWeightUnit] = useState<WeightUnit>("kg");
   const [newSetDistanceUnit, setNewSetDistanceUnit] =
@@ -177,39 +158,35 @@ export function WorkoutView<M extends WorkoutEditorMode>(
   const [editVolume, setEditVolumes] = useState<boolean>(false);
   const [advancedSet, setAdvancedSet] = useState<[number, number] | null>(null);
 
-  const initialWorkoutRef = useRef<EditableWorkout<M> | null>(null);
-  const initialExercisesRef = useRef<EditableExercise<M>[] | null>(null);
-  const initialSetsRef = useRef<EditableSet<M>[][] | null>(null);
+  const initialFullWorkoutRef = useRef<FullDetachedWorkoutForMode<M>>(loadWithExisting && updateWorkoutId ? structuredClone(loadWithExisting) : blankState(strategy));
 
   useEffect(() => {
     return CACHE_FACTORY.subscribe(async (e) => {
-      if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'write' && e.key !== undefined) {
-        const newExercise = (await fetchExercises()).get(e.key);
+      const keyChange = e.key;
+      if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'write' && keyChange !== undefined) {
+        const newExercise = (await fetchExercises()).get(keyChange);
         if (!newExercise) {
-          console.error(`Got write commit but ${e.key} could not be found in new exercises`);
+          console.error(`Got write commit but ${keyChange} could not be found in new exercises`);
           return;
         }
-        const _updateExercises = (exers: EditableExercise<M>[] | null, setFunction: (a: EditableExercise<M>[]) => void) => {
-          if (exers === null) {
-            return;
-          }
-          if (!exers.some(ex => ex.exercise.id === newExercise.id)) {
-            return;
-          }
-          const newExers = exers.map(ex => {
-            if (ex.exercise.id === newExercise.id) {
-              return {...ex, exercise: newExercise};
-            } else {
-              return ex;
-            }
-          });
-          setFunction(newExers);
-        }
-        _updateExercises(exercises, setExercises);
-        _updateExercises(initialExercisesRef.current, (a) => { initialExercisesRef.current = a });
+        // make typescript not complain
+        // EditableExercise<M>["exercise"] === ExerciseRow for all M
+        const predicate = (editableExercise: EditableExercise<M>) => editableExercise.exercise.id === keyChange;
+        setFullWorkout((prev) => {
+          return updateExercisesForWorkoutWhere({fullWorkout: prev, predicate: predicate, key: 'exercise', value: newExercise});
+        });
+        initialFullWorkoutRef.current
+          = updateExercisesForWorkoutWhere({fullWorkout: initialFullWorkoutRef.current, predicate: predicate, key: 'exercise', value: newExercise});
+      }
+      if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'delete' && keyChange !== undefined) {
+        setFullWorkout((prev) => {
+          return removeExerciseFromWorkoutById({fullWorkout: prev, exerciseId: keyChange});
+        });
+        initialFullWorkoutRef.current
+          = removeExerciseFromWorkoutById({fullWorkout: initialFullWorkoutRef.current, exerciseId: keyChange});
       }
     });
-  }, [exercises]);
+  }, [fullWorkout, initialFullWorkoutRef.current]);
 
   const clearAdvancedExercise = () => {
     setAdvancedExercise(null);
@@ -217,74 +194,16 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     setEditVolumes(false);
   };
 
-  const resetAll = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const profile = await requireGetUser();
-      if (!profile) return;
-
-      setNewSetWeightUnit(profile.default_weight_unit);
-      setNewSetDistanceUnit(profile.default_distance_unit);
-      setOpenExercisePicker(false);
-      setExercisePickerFunction(null);
-      setOpenDatePicker(false);
-      setAdvancedSet(null);
-      clearAdvancedExercise();
-      
-      if (loadWithExisting) {
-        setWorkout(loadWithExisting.workout);
-        setExercises(loadWithExisting.exercises);
-        setSets(loadWithExisting.sets);
-        if (updateWorkoutId) {
-          initialWorkoutRef.current = loadWithExisting.workout;
-          initialExercisesRef.current = loadWithExisting.exercises;
-          initialSetsRef.current = loadWithExisting.sets;
-        } else {
-          const initial = blankState(strategy);
-          initialWorkoutRef.current = initial.workout;
-          initialExercisesRef.current = initial.exercises;
-          initialSetsRef.current = initial.sets;
-        }
-      } else {
-        const initial = blankState(strategy);
-        initialWorkoutRef.current = initial.workout;
-        initialExercisesRef.current = initial.exercises;
-        initialSetsRef.current = initial.sets;
-
-        setWorkout(initial.workout);
-        setExercises(initial.exercises);
-        setSets(initial.sets);
-      }
-    } finally {
-      setIsLoading(false);
+  const isDirty = useMemo(() => {
+    if (updateWorkoutId === null && fullDetachedWorkoutEqual(initialFullWorkoutRef.current, blankState(strategy))) {
+      // allow saving blank new logs
+      return true;
     }
-  }, [strategy, loadWithExisting, updateWorkoutId]);
-
-  useEffect(() => {
-    if (!isActive) return;
-    void resetAll();
-  }, [isActive, strategy, loadWithExisting]);
-
-  const isSavable = useMemo(() => {
-    const initialWorkout = initialWorkoutRef.current;
-    const initialExercises = initialExercisesRef.current;
-    const initialSets = initialSetsRef.current;
-
-    if (!initialWorkout || !initialExercises || !initialSets) {
-      return false;
-    }
-
-    const wEqual = editableWorkoutEqual(initialWorkout, workout);
-    const eEqual = arraysEqual(
-      initialExercises,
-      exercises,
-      editableExerciseEqual,
-    );
-    const sEqual = doubleArraysEqual(initialSets, sets, editableSetEqual);
-    return !(wEqual && eEqual && sEqual);
-  }, [workout, exercises, sets, initialWorkoutRef.current, initialExercisesRef.current, initialSetsRef.current]);
+    return !fullDetachedWorkoutEqual(initialFullWorkoutRef.current, fullWorkout);
+  }, [fullWorkout, initialFullWorkoutRef.current]);
 
   const renderAssociatedProgram = () => {
+    const workout = fullWorkout.workout;
     if (!workoutHasProgram(workout)) {
       return null;
     }
@@ -305,25 +224,17 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     );
   };
 
-  const handleUpdateWorkout = <K extends keyof EditableWorkout<M>>(
-    key: K,
-    value: EditableWorkout<M>[K],
-  ) => {
-    setWorkout((prev) => {
-      return { ...prev, [key]: value };
-    });
-  };
-
   const renderHeader = () => {
+    const workout = fullWorkout.workout;
     return (
       <View style={{ marginBottom: 16 }}>
         {/* Name row */}
         <TextField
           value={workout.name}
           onChangeText={(text) => {
-            const newWorkout: EditableWorkout<M> = { ...workout };
-            newWorkout.name = text;
-            setWorkout(newWorkout);
+            setFullWorkout((prev) => {
+              return updateWorkoutInWorkout({fullWorkout: prev, key: 'name', value: text})
+            })
           }}
           placeholder="Untitled workout"
           placeholderTextColor={colors.placeholderTextColor}
@@ -352,19 +263,20 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           workout,
           allowEditing,
           isLoading,
-          handleUpdateWorkout,
           openDatePicker,
           setOpenDatePicker,
           newSetWeightUnit,
           setNewSetWeightUnit,
           newSetDistanceUnit,
           setNewSetDistanceUnit,
+          setFullWorkout,
         })}
       </View>
     );
   };
 
   const renderWorkoutFooter = () => {
+    const workout = fullWorkout.workout;
     return (
       <View>
         <Text style={typography.label}>Notes</Text>
@@ -372,9 +284,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           multiline
           value={workout.notes ?? ""}
           onChangeText={(text) => {
-            const newWorkout = { ...workout };
-            newWorkout.notes = text;
-            setWorkout(newWorkout);
+            setFullWorkout((prev) => {
+              return updateWorkoutInWorkout({fullWorkout: prev, key: 'notes', value: text})
+            })
           }}
           placeholder="Any notes about this workout (RPE goals, cues, etc.)"
           placeholderTextColor={colors.placeholderTextColor}
@@ -412,7 +324,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             <Button
               title={`${updateWorkoutId !== null ? "Update" : "Create"} ${isTemplateWorkout(workout) ? "Template" : "Log"}`}
               onPress={handleSave}
-              disabled={!isSavable || isLoading || !allowEditing}
+              disabled={!isDirty || isLoading || !allowEditing}
               style={{ flex: 1 }}
             />
           )}
@@ -421,158 +333,34 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     );
   };
 
-  const handleRemoveSetInExercise = (
-    exerciseIndex: number,
-    setIndex: number,
-  ) => {
-    if (exerciseIndex < 0 || exerciseIndex >= sets.length) {
-      return;
-    }
-    if (setIndex < 0 || setIndex >= sets[exerciseIndex].length) {
-      return;
-    }
-    setSets((prev) => {
-      const newSets = [...prev];
-      newSets[exerciseIndex] = newSets[exerciseIndex].filter(
-        (_, i) => i !== setIndex,
-      );
-      return newSets;
-    });
-    if (advancedSet !== null && advancedSet[1] === setIndex) {
-      setAdvancedSet(null);
-    }
-  };
-
-  const handleSwapSetsInExercise = (
-    exerciseIndex: number,
-    s1: number,
-    s2: number,
-  ) => {
-    if (exerciseIndex < 0 || exerciseIndex >= sets.length) {
-      return;
-    }
-    const exerciseSets = sets[exerciseIndex];
-    if (
-      s1 < 0 ||
-      s2 < 0 ||
-      s1 >= exerciseSets.length ||
-      s2 >= exerciseSets.length
-    ) {
-      return;
-    }
-    setSets((prev) => {
-      const newSets = [...prev];
-      [sets[exerciseIndex][s1], sets[exerciseIndex][s2]] = [
-        sets[exerciseIndex][s2],
-        sets[exerciseIndex][s1],
-      ];
-      return newSets;
-    });
-    if (advancedSet !== null) {
-      if (advancedSet[1] === s1) {
-        setAdvancedSet([advancedSet[0], s2]);
-      } else if (advancedSet[1] === s2) {
-        setAdvancedSet([advancedSet[0], s1]);
-      }
-    }
-  };
-
-  const handleRemoveExercise = (index: number) => {
-    if (index < 0 || index >= sets.length || index >= exercises.length) {
-      return;
-    }
-    setExercises((prev) => prev.filter((_, i) => i !== index));
-    setSets((prev) => prev.filter((_, i) => i !== index));
-    if (advancedExercise === index) {
-      clearAdvancedExercise();
-    }
-    if (advancedSet !== null && advancedSet[0] === index) {
-      setAdvancedSet(null);
-    }
-  };
-
-  const handleUpdateExercise = <
-    K extends keyof EditableExercise<WorkoutEditorMode>,
-  >(
-    exerciseIndex: number,
-    key: K,
-    value: EditableExercise<WorkoutEditorMode>[K],
-  ) => {
-    if (exerciseIndex < 0 || exerciseIndex >= sets.length) {
-      return;
-    }
-    setExercises((prev) => {
-      const next = [...prev];
-      next[exerciseIndex] = { ...next[exerciseIndex], [key]: value };
-      return next;
-    });
-  };
-
-  // have to use WorkoutEditorMode and NOT M
-  const handleUpdateSet = <K extends keyof EditableSet<M>>(
-    exerciseIndex: number,
-    setIndex: number,
-    key: K,
-    value: EditableSet<M>[K],
-  ) => {
-    if (exerciseIndex < 0 || exerciseIndex >= sets.length) {
-      return;
-    }
-    if (setIndex < 0 || setIndex >= sets[exerciseIndex].length) {
-      return;
-    }
-    setSets((prev) => {
-      const next = [...prev];
-      const exerciseSets = [...next[exerciseIndex]];
-      const current = exerciseSets[setIndex];
-      exerciseSets[setIndex] = { ...current, [key]: value };
-      next[exerciseIndex] = exerciseSets;
-      return next;
-    });
-  };
-
   const renderAdvancedSet = () => {
     if (advancedSet === null) {
       return null;
     }
-    function handleUpdateSetCurried<K extends keyof EditableSet<M>>(
-      key: K,
-      value: EditableSet<M>[K],
-    ) {
-      handleUpdateSet(exerciseIndex, setIndex, key, value);
-    }
     const [exerciseIndex, setIndex] = advancedSet;
-    const set = sets[exerciseIndex][setIndex];
-    const exercise = exercises[exerciseIndex];
+    const set = fullWorkout.sets[exerciseIndex][setIndex];
+    const exercise = fullWorkout.exercises[exerciseIndex];
     const ctx: AdvancedSetRenderProps<M> = {
       set,
       setIndex,
-      handleUpdateSetCurried,
       isLoading,
       allowEditing,
       exercise,
       exerciseIndex,
-      totalSetsInExercise: sets[exerciseIndex].length,
-      handleSwapSetsInExercise,
-      handleRemoveSetInExercise,
+      totalSetsInExercise: fullWorkout.sets[exerciseIndex].length,
       isVisible: true,
       onRequestClose: () => setAdvancedSet(null),
+      setFullWorkout,
+      setAdvancedSet,
     };
     return strategy.renderAdvancedSetMenu(ctx);
   };
 
   const renderSet = (
     exerciseIndex: number,
-    set: AnyEditableSet,
+    set: EditableSet<M>,
     setIndex: number,
   ) => {
-    function handleUpdateSetCurried<K extends keyof EditableSet<M>>(
-      key: K,
-      value: EditableSet<M>[K],
-    ) {
-      handleUpdateSet(exerciseIndex, setIndex, key, value);
-    }
-
     return (
       <View
         key={`${exerciseIndex - setIndex}`}
@@ -595,9 +383,10 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             strategy.renderSetBody({
               set,
               setIndex,
-              handleUpdateSetCurried,
               isLoading,
               allowEditing,
+              setFullWorkout,
+              exerciseIndex,
             })
           ) : (
             <Text>Unknown set type. Cannot render</Text>
@@ -614,70 +403,14 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     );
   };
 
-  const handleAddSet = (exerciseIndex: number) => {
-    if (exerciseIndex < 0 || exerciseIndex >= sets.length) {
-      return;
-    }
-    setSets((prev) => {
-      const next = [...prev];
-      if (next[exerciseIndex].length > 0) {
-        next[exerciseIndex] = [
-          ...next[exerciseIndex],
-          { ...next[exerciseIndex][next[exerciseIndex].length - 1] },
-        ];
-      } else {
-        next[exerciseIndex] = [
-          ...next[exerciseIndex],
-          {
-            ...strategy.createEmptySet({
-              weightUnit: newSetWeightUnit,
-              distanceUnit: newSetDistanceUnit,
-            }),
-            performance_type: isTemplateWorkout(workout)
-              ? "percentage"
-              : "weight",
-          },
-        ];
-      }
-      return next;
-    });
-  };
-
-  const handleSwapExercisePositions = (i1: number, i2: number) => {
-    if (i1 < 0 || i2 < 0 || i1 >= exercises.length || i2 >= exercises.length) {
-      return;
-    }
-
-    setExercises((prev) => {
-      const next = [...prev];
-      [next[i1], next[i2]] = [next[i2], next[i1]];
-      return next;
-    });
-
-    setSets((prev) => {
-      const next = [...prev];
-      [next[i1], next[i2]] = [next[i2], next[i1]];
-      return next;
-    });
-    if (advancedExercise === i1) {
-      setAdvancedExercise(i2);
-    } else if (advancedExercise === i2) {
-      setAdvancedExercise(i1);
-    }
-    if (advancedSet !== null && advancedSet[0] === i1) {
-      setAdvancedSet([i2, advancedSet[1]]);
-    } else if (advancedSet !== null && advancedSet[0] === i2) {
-      setAdvancedSet([i1, advancedSet[1]]);
-    }
-  };
-
   const renderAdvancedExercise = () => {
-    if (advancedExercise === null) {
+    if (advancedExercise === null || fullWorkout.exercises.length === 0) {
       return null;
     }
     const exerciseIdx = advancedExercise;
-    const setsForExercise = sets[exerciseIdx];
-    const exercise = exercises[exerciseIdx];
+    const workout = fullWorkout.workout;
+    const setsForExercise = fullWorkout.sets[exerciseIdx];
+    const exercise = fullWorkout.exercises[exerciseIdx];
     let bestSetByE1RM: [EditableSet<"log">, number] | null = null;
     if (isLogWorkout(workout) && setsForExercise.length > 0) {
       const logSets = setsForExercise.filter(
@@ -753,7 +486,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
         >
           Options
         </Text>
-        {allowEditing && exercises.length > 1 && (
+        {allowEditing && fullWorkout.exercises.length > 1 && (
           <View
             style={{
               flexDirection: "row",
@@ -767,37 +500,31 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             {exerciseIdx !== 0 && (
               <Button
                 title="&uarr;"
-                onPress={() =>
-                  handleSwapExercisePositions(exerciseIdx - 1, exerciseIdx)
-                }
+                onPress={() => {
+                  setAdvancedExercise(exerciseIdx - 1);
+                  setFullWorkout((prev) => {
+                    return swapExercisesInWorkout({fullWorkout: prev, exerciseIndexFirst: exerciseIdx - 1, exerciseIndexSecond: exerciseIdx})
+                  })
+                }}
                 variant="secondary"
                 style={{ padding: 4 }}
                 textProps={{ style: { fontSize: 12 } }}
                 disabled={isLoading || !allowEditing}
               />
             )}
-            {exerciseIdx !== exercises.length - 1 && (
+            {exerciseIdx !== fullWorkout.exercises.length - 1 && (
               <Button
                 title="&darr;"
-                onPress={() =>
-                  handleSwapExercisePositions(exerciseIdx, exerciseIdx + 1)
-                }
+                onPress={() => {
+                  setAdvancedExercise(exerciseIdx + 1);
+                  setFullWorkout((prev) => {
+                    return swapExercisesInWorkout({fullWorkout: prev, exerciseIndexFirst: exerciseIdx + 1, exerciseIndexSecond: exerciseIdx})
+                  })
+                }}
                 variant="secondary"
                 style={{ padding: 4 }}
                 textProps={{ style: { fontSize: 12 } }}
                 disabled={isLoading || !allowEditing}
-              />
-            )}
-            {setsForExercise.length === 0 && (
-              <Button
-                title="&times;"
-                onPress={() => handleRemoveExercise(exerciseIdx)}
-                variant="revert"
-                style={{ padding: 4 }}
-                textProps={{ style: { fontSize: 12 } }}
-                disabled={
-                  setsForExercise.length > 0 || isLoading || !allowEditing
-                }
               />
             )}
           </View>
@@ -807,7 +534,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             title={"Change Exercise"}
             onPress={() => {
               setExercisePickerFunction(() => (newExercise: ExerciseRow) => {
-                handleUpdateExercise(exerciseIdx, "exercise", newExercise);
+                setFullWorkout((prev) => {
+                  return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'exercise', value: newExercise});
+                })
                 clearAdvancedExercise();
               });
               setOpenExercisePicker(true);
@@ -822,7 +551,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             multiline
             value={exercise.notes ?? ""}
             onChangeText={(text) =>
-              handleUpdateExercise(exerciseIdx, "notes", text)
+              setFullWorkout((prev) => {
+                return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'notes', value: text});
+              })
             }
             placeholder="Any notes about this exercise (RPE goals, cues, etc.)"
             placeholderTextColor={colors.placeholderTextColor}
@@ -922,7 +653,10 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           <Button
             title={`Delete Exercise`}
             onPress={() => {
-              handleRemoveExercise(exerciseIdx);
+              clearAdvancedExercise();
+              setFullWorkout((prev) => {
+                return removeExerciseFromWorkoutByIndex({fullWorkout: prev, exerciseIndex: exerciseIdx})
+              })
             }}
             variant="revert"
             disabled={!allowEditing || isLoading}
@@ -953,13 +687,14 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                   setOpenExercisePicker(true);
                   setExercisePickerFunction(
                     () => (exerciseRow: ExerciseRow) => {
-                      const newExercise: EditableExercise<WorkoutEditorMode> = {
+                      const newExercise: EditableExercise<M> = {
                         exercise: exerciseRow,
                         superset_group: null,
                         notes: "",
                       };
-                      setExercises([...exercises, newExercise]);
-                      setSets([...sets, []]);
+                      setFullWorkout((prev) => {
+                        return addExerciseToWorkout({fullWorkout: prev, newExercise})
+                      });
                     },
                   );
                 }}
@@ -970,14 +705,14 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           )}
         </View>
 
-        {exercises.length === 0 ? (
+        {fullWorkout.exercises.length === 0 ? (
           <Text style={typography.hint}>
             No exercises added yet. Tap &quot;Add Exercise&quot; to build this
             workout.
           </Text>
         ) : (
-          exercises.map((ex, exerciseIdx) => {
-            const setsForExercise = sets[exerciseIdx];
+          fullWorkout.exercises.map((ex, exerciseIdx) => {
+            const setsForExercise = fullWorkout.sets[exerciseIdx];
             return (
               <View
                 key={`${ex.exercise.id}-${exerciseIdx}`}
@@ -1029,35 +764,22 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                     title={"Superset"}
                     isSelected={ex.superset_group !== null}
                     onPress={() => {
-                      if (ex.superset_group !== null) {
-                        handleUpdateExercise(
-                          exerciseIdx,
-                          "superset_group",
-                          null,
-                        );
-                        return;
-                      }
-                      for (let i = exerciseIdx - 1; i >= 0; i--) {
-                        const exerciseBefore = exercises[i];
-                        if (exerciseBefore.superset_group === null) continue;
-                        handleUpdateExercise(
-                          exerciseIdx,
-                          "superset_group",
-                          exerciseBefore.superset_group,
-                        );
-                        return;
-                      }
-                      for (let i = exerciseIdx + 1; i < exercises.length; i++) {
-                        const exerciseAfter = exercises[i];
-                        if (exerciseAfter.superset_group === null) continue;
-                        handleUpdateExercise(
-                          exerciseIdx,
-                          "superset_group",
-                          exerciseAfter.superset_group,
-                        );
-                        return;
-                      }
-                      handleUpdateExercise(exerciseIdx, "superset_group", 1);
+                      setFullWorkout((prev) => {
+                        if (ex.superset_group !== null) {
+                          return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: null});
+                        }
+                        for (let i = exerciseIdx - 1; i >= 0; i--) {
+                          const exerciseBefore = fullWorkout.exercises[i];
+                          if (exerciseBefore.superset_group === null) continue;
+                          return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: exerciseBefore.superset_group});
+                        }
+                        for (let i = exerciseIdx + 1; i < fullWorkout.exercises.length; i++) {
+                          const exerciseAfter = fullWorkout.exercises[i];
+                          if (exerciseAfter.superset_group === null) continue;
+                          return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: exerciseAfter.superset_group});
+                        }
+                        return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: 1});
+                      });
                     }}
                     disabled={isLoading || !allowEditing}
                   />
@@ -1066,11 +788,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                       numberValue={ex.superset_group}
                       onChangeNumber={(value) => {
                         if (value !== null && value >= 1) {
-                          handleUpdateExercise(
-                            exerciseIdx,
-                            "superset_group",
-                            value,
-                          );
+                          setFullWorkout((prev) => {
+                            return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value})
+                          });
                         }
                       }}
                       numberType={"int"}
@@ -1088,7 +808,25 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                   {allowEditing && (
                     <Button
                       title={"Add Set"}
-                      onPress={() => handleAddSet(exerciseIdx)}
+                      onPress={() => {
+                        setFullWorkout((prev) => {
+                          const setsForExerciseInWorkout = fullWorkout.sets[exerciseIdx];
+                          if (setsForExerciseInWorkout.length > 0) {
+                            const lastSetSeen = setsForExerciseInWorkout.at(-1);
+                            if (lastSetSeen) {
+                              return addSetToWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, newSet: {...lastSetSeen}});
+                            }
+                          }
+                          return addSetToWorkout({
+                            fullWorkout: prev,
+                            exerciseIndex: exerciseIdx,
+                            newSet: strategy.createEmptySet({
+                              weightUnit: newSetWeightUnit,
+                              distanceUnit: newSetDistanceUnit,
+                            })
+                          })
+                        })
+                      }}
                       style={{ marginLeft: "auto", padding: 4 }}
                       textProps={{
                         style: {
@@ -1123,54 +861,32 @@ export function WorkoutView<M extends WorkoutEditorMode>(
     setIsLoading(true);
 
     const finalWorkout =
-      workout.name.length === 0
-        ? { ...workout, name: "Untitled Workout" }
-        : workout;
+      fullWorkout.workout.name.length === 0
+        ? { ...fullWorkout.workout, name: "Untitled Workout" }
+        : fullWorkout.workout;
+    
+    const payload: FullDetachedWorkoutForMode<M> = {...fullWorkout, workout: finalWorkout};
 
-    if (finalWorkout !== workout) setWorkout(finalWorkout);
+    setFullWorkout(payload);
 
     try {
-      const payload: FullDetachedWorkoutForMode<M> = {
-        workout: finalWorkout,
-        exercises,
-        sets,
-      };
-
       let success = false;
-      let savedWorkout = finalWorkout;
-      let savedExercises = exercises;
-      let savedSets = sets;
 
       if (isFullDetachedTemplateWorkout(payload)) {
         success = await upsertTemplateWorkout(payload, updateWorkoutId);
       } else if (isFullDetachedLogWorkout(payload)) {
-        const user = await requireGetUser();
-        if (!user) return;
-
-        const workoutWithUser = { ...payload.workout, user_id: user.user_id };
         const [wasSuccess, newId] = await upsertWorkoutLog({
-          payload: {
-            workout: workoutWithUser,
-            exercises: payload.exercises,
-            sets: payload.sets,
-          },
+          payload,
           workoutLogId: updateWorkoutId,
         });
 
         success = wasSuccess;
 
         if (success) {
-          if (newId === null)
+          if (newId === null) {
             throw new Error("Had successful upsert but new id was null");
-          savedWorkout = workoutWithUser;
-          onSuccessfulSave(
-            {
-              workout: workoutWithUser,
-              exercises: savedExercises,
-              sets: savedSets,
-            },
-            newId,
-          );
+          }
+          onSuccessfulSave({...payload, workoutId: newId} satisfies FullAttachedWorkout<M>);
         }
       } else {
         throw new Error(
@@ -1180,9 +896,7 @@ export function WorkoutView<M extends WorkoutEditorMode>(
 
       if (success) {
         showAlert("Successfully saved workout!");
-        initialWorkoutRef.current = savedWorkout;
-        initialExercisesRef.current = savedExercises;
-        initialSetsRef.current = savedSets;
+        initialFullWorkoutRef.current = structuredClone(payload);
 
         if (requestCloseOnSuccessfulSave) requestClose();
       }

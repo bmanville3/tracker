@@ -1,7 +1,6 @@
 import { Database, supabase } from "../supabase";
 import { CACHE_FACTORY } from "../swrCache";
 import {
-  AllOrNothing,
   AssociatedProgramFields,
   ExerciseRow,
   ISODate,
@@ -11,7 +10,7 @@ import {
   WorkoutExerciseSetLogRow,
   WorkoutLogRow,
 } from "../types";
-import { anyErrorToString, OmitNever, requireGetUser, showAlert } from "../utils";
+import { AllOrNothing, anyErrorToString, OmitNever, requireGetUser, showAlert } from "../utils";
 import { EXERCISE_CACHE_NAME, fetchExercises } from "./exerciseApi";
 import {
   EditableExercise,
@@ -139,7 +138,10 @@ export async function upsertWorkoutLog(ctx: {
   if (user === null) return [false, ctx.workoutLogId ?? null];
   const { payload, workoutLogId } = ctx;
   const { workout, exercises, sets } = payload;
-  const { program_row, ...baseWorkout } = workout;
+  const { user_id, program_row, ...baseWorkout } = workout;
+  if (user_id && user_id !== user.user_id) {
+    throw new Error(`Tried to upsert with user_id=${user_id} but user.user_id=${user.user_id}`);
+  }
 
   let payloadProgram: AllOrNothing<AssociatedProgramFields>;
 
@@ -184,12 +186,14 @@ export async function upsertWorkoutLog(ctx: {
       ...baseWorkout,
       ...payloadProgram,
       id: workoutLogId,
+      user_id: user.user_id,
     } satisfies WorkoutLogRow;
     command = supabase.from("workout_log").upsert(workoutRowPayload);
   } else {
     const workoutRowPayload = {
       ...baseWorkout,
       ...payloadProgram,
+      user_id: user.user_id,
     } satisfies OmitNever<WorkoutLogRow, "id">;
     command = supabase.from("workout_log").insert(workoutRowPayload);
   }

@@ -270,10 +270,6 @@ export function anyErrorToString(e: any, fallback: string): string {
       : e?.message || fallback;
 }
 
-export type OmitNever<T, K extends keyof T> = Omit<T, K> & {
-  [P in K]?: never;
-};
-
 export function stringifyList(items: string[]): string {
   if (items.length === 1) return items[0];
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
@@ -318,3 +314,8 @@ export function rgbColorGenerator(step: number, maxSteps: number): string {
   const rgb = hsvToRgb(h, s, v);
   return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
 }
+
+export type OmitNever<T, K extends keyof T> = Omit<T, K> & {
+  [P in K]?: never;
+};
+export type AllOrNothing<T> = T | { [K in keyof T]: null };

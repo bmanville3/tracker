@@ -1,3 +1,4 @@
+import { AllOrNothing } from "../utils";
 import {
   DistanceUnit,
   RPE,
@@ -6,7 +7,7 @@ import {
   WeightUnit,
   WorkoutType,
 } from "./enums";
-import { AllOrNothing, ISODate, UUID } from "./generic";
+import { ISODate, UUID } from "./generic";
 
 export type AssociatedProgramFields = {
   program_id: UUID;

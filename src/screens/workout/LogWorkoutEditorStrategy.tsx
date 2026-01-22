@@ -1,7 +1,10 @@
 import {
-  EditableExercise,
   EditableSet,
   EditableWorkout,
+  removeSetFromWorkout,
+  swapSetsInExercises,
+  updateSetForWorkout,
+  updateWorkoutInWorkout
 } from "@/src/api/workoutSharedApi";
 import {
   Button,
@@ -27,7 +30,7 @@ import {
   changeDistanceUnit,
   changeTimeUnit,
   changeWeightUnit,
-  todayISO,
+  todayISO
 } from "@/src/utils";
 import {
   Pressable,
@@ -43,17 +46,6 @@ import {
   SetRenderProps,
   WorkoutEditorModeStrategy,
 } from "./WorkoutView";
-
-type SetUpdaterType = <K extends keyof EditableSet<"log">>(
-  key: K,
-  value: EditableSet<"log">[K],
-) => void;
-type BaseSetEditorCtx = {
-  isLoading: boolean;
-  allowEditing: boolean;
-  set: EditableSet<"log">;
-  handleUpdateSetCurried: SetUpdaterType;
-};
 
 function showField<T>(
   allowEditing: boolean,
@@ -104,13 +96,17 @@ function Metric(props: { children: React.ReactNode }) {
   );
 }
 
-function weightChangerForSet(ctx: BaseSetEditorCtx) {
-  const { isLoading, allowEditing, set, handleUpdateSetCurried } = ctx;
+function weightChangerForSet(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <NumberField
       numberValue={set.weight}
       placeholder="Weight"
-      onChangeNumber={(value) => handleUpdateSetCurried("weight", value)}
+      onChangeNumber={(value) => {
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'weight', value})
+        })
+      }}
       numberType={"float"}
       editable={!isLoading && allowEditing}
       style={{
@@ -123,13 +119,17 @@ function weightChangerForSet(ctx: BaseSetEditorCtx) {
   );
 }
 
-function duartionChangerForSet(ctx: BaseSetEditorCtx) {
-  const { isLoading, allowEditing, set, handleUpdateSetCurried } = ctx;
+function duartionChangerForSet(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <NumberField
       numberValue={set.duration}
       placeholder={set.time_unit}
-      onChangeNumber={(value) => handleUpdateSetCurried("duration", value)}
+      onChangeNumber={(value) => {
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'duration', value})
+        })
+      }}
       numberType={"float"}
       editable={!isLoading && allowEditing}
       style={{
@@ -142,15 +142,17 @@ function duartionChangerForSet(ctx: BaseSetEditorCtx) {
   );
 }
 
-function distanceChangerForSet(ctx: BaseSetEditorCtx) {
-  const { isLoading, allowEditing, set } = ctx;
+function distanceChangerForSet(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <NumberField
       numberValue={set.distance_per_rep}
       placeholder="Dist."
-      onChangeNumber={(value) =>
-        ctx.handleUpdateSetCurried("distance_per_rep", value)
-      }
+      onChangeNumber={(value) => {
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'distance_per_rep', value})
+        })
+      }}
       numberType="float"
       editable={!isLoading && allowEditing}
       style={{
@@ -163,8 +165,8 @@ function distanceChangerForSet(ctx: BaseSetEditorCtx) {
   );
 }
 
-function repsChanger(ctx: BaseSetEditorCtx) {
-  const { isLoading, allowEditing, set, handleUpdateSetCurried } = ctx;
+function repsChanger(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <NumberField
       numberValue={set.reps}
@@ -173,7 +175,9 @@ function repsChanger(ctx: BaseSetEditorCtx) {
         if (value !== null && value < 0) {
           return;
         }
-        handleUpdateSetCurried("reps", value);
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'reps', value})
+        })
       }}
       numberType="float"
       editable={!isLoading && allowEditing}
@@ -187,8 +191,8 @@ function repsChanger(ctx: BaseSetEditorCtx) {
   );
 }
 
-function weightUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
-  const { isLoading, set, handleUpdateSetCurried } = ctx;
+function weightUnitPickerForSet(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <ModalPicker
       options={WEIGHT_UNITS.map((u) => {
@@ -196,13 +200,15 @@ function weightUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
       })}
       value={set.weight_unit}
       onChange={(u) => {
-        if (set.weight !== null) {
-          handleUpdateSetCurried(
-            "weight",
-            changeWeightUnit(set.weight, set.weight_unit, u),
-          );
+        const setWeight = set.weight;
+        if (setWeight !== null) {
+          setFullWorkout((prev) => {
+            return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'weight', value: changeWeightUnit(setWeight, set.weight_unit, u)})
+          });
         }
-        handleUpdateSetCurried("weight_unit", u);
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'weight_unit', value: u})
+        });
       }}
       disabled={isLoading} // allowing edit here on !allowEdit so we can change display
       pressableProps={{ style: [styles.pressableBase, styles.pressable] }}
@@ -210,8 +216,8 @@ function weightUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
   );
 }
 
-function timeUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
-  const { isLoading, set, handleUpdateSetCurried } = ctx;
+function timeUnitPickerForSet(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <ModalPicker
       options={TIME_UNITS.map((u) => {
@@ -219,13 +225,15 @@ function timeUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
       })}
       value={set.time_unit}
       onChange={(u) => {
-        if (set.duration !== null) {
-          handleUpdateSetCurried(
-            "duration",
-            changeTimeUnit(set.duration, set.time_unit, u),
-          );
+        const duration = set.duration;
+        if (duration !== null) {
+          setFullWorkout((prev) => {
+            return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'duration', value: changeTimeUnit(duration, set.time_unit, u)});
+          });
         }
-        handleUpdateSetCurried("time_unit", u);
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'time_unit', value: u})
+        });
       }}
       disabled={isLoading} // allowing edit here on !allowEdit so we can change display
       pressableProps={{ style: [styles.pressableBase, styles.pressable] }}
@@ -233,20 +241,22 @@ function timeUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
   );
 }
 
-function distanceUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
-  const { isLoading, set, handleUpdateSetCurried } = ctx;
+function distanceUnitPickerForSet(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <ModalPicker
       options={DISTANCE_UNITS.map((u) => ({ label: u, value: u }))}
       value={set.distance_unit}
       onChange={(u) => {
-        if (set.distance_per_rep !== null) {
-          handleUpdateSetCurried(
-            "distance_per_rep",
-            changeDistanceUnit(set.distance_per_rep, set.distance_unit, u),
-          );
+        const distance = set.distance_per_rep;
+        if (distance !== null) {
+          setFullWorkout((prev) => {
+            return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'distance_per_rep', value: changeDistanceUnit(distance, set.distance_unit, u)})
+          })
         }
-        handleUpdateSetCurried("distance_unit", u);
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'distance_unit', value: u})
+        })
       }}
       disabled={isLoading}
       pressableProps={{ style: [styles.pressableBase, styles.pressable] }}
@@ -254,8 +264,8 @@ function distanceUnitPickerForSet(ctx: Omit<BaseSetEditorCtx, "allowEditing">) {
   );
 }
 
-function rpePickerForSet(ctx: BaseSetEditorCtx) {
-  const { isLoading, allowEditing, set, handleUpdateSetCurried } = ctx;
+function rpePickerForSet(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <ModalPicker
       options={[
@@ -264,7 +274,11 @@ function rpePickerForSet(ctx: BaseSetEditorCtx) {
         }),
         { label: "RPE", value: null },
       ]}
-      onChange={(value) => handleUpdateSetCurried("rpe", value)}
+      onChange={(value) => {
+        setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'rpe', value})
+        })
+      }}
       pressableProps={{
         style: [
           styles.pressableBase,
@@ -294,11 +308,7 @@ function subHeaderInAdvanced(text: string) {
 }
 
 function commonAdvancedHeader(
-  ctx: BaseSetEditorCtx & {
-    exercise: EditableExercise<"log">;
-    exerciseIndex: number;
-    setIndex: number;
-  },
+  ctx: AdvancedSetRenderProps<'log'>,
 ) {
   const { exercise, exerciseIndex, setIndex } = ctx;
   return (
@@ -322,21 +332,15 @@ function commonAdvancedHeader(
   );
 }
 
-function commonAdvancedFooter(ctx: {
-  allowEditing: boolean;
-  isLoading: boolean;
-  exerciseIndex: number;
-  setIndex: number;
-  handleRemoveSetInExercise: (e: number, s: number) => void;
-  onRequestClose: () => void;
-}) {
+function commonAdvancedFooter(ctx: AdvancedSetRenderProps<'log'>) {
   const {
     allowEditing,
     isLoading,
     exerciseIndex,
     setIndex,
-    handleRemoveSetInExercise,
     onRequestClose,
+    setFullWorkout,
+    setAdvancedSet,
   } = ctx;
   return (
     <View>
@@ -345,7 +349,10 @@ function commonAdvancedFooter(ctx: {
         <Button
           title="Delete Set"
           onPress={() => {
-            handleRemoveSetInExercise(exerciseIndex, setIndex);
+            setAdvancedSet(null);
+            setFullWorkout((prev) => {
+              return removeSetFromWorkout({fullWorkout: prev, exerciseIndex, setIndex});
+            })
           }}
           variant="revert"
           disabled={!allowEditing || isLoading}
@@ -355,21 +362,15 @@ function commonAdvancedFooter(ctx: {
   );
 }
 
-function commonMoveOptions(ctx: {
-  allowEditing: boolean;
-  isLoading: boolean;
-  totalSetsInExercise: number;
-  setIndex: number;
-  exerciseIndex: number;
-  handleSwapSetsInExercise: (e: number, s1: number, s2: number) => void;
-}) {
+function commonMoveOptions(ctx: AdvancedSetRenderProps<'log'>) {
   const {
     allowEditing,
     isLoading,
     totalSetsInExercise,
     setIndex,
     exerciseIndex,
-    handleSwapSetsInExercise,
+    setFullWorkout,
+    setAdvancedSet,
   } = ctx;
   if (!allowEditing || totalSetsInExercise === 1) {
     return null;
@@ -382,8 +383,11 @@ function commonMoveOptions(ctx: {
       {setIndex !== 0 && (
         <Button
           title="&uarr;"
-          onPress={() =>
-            handleSwapSetsInExercise(exerciseIndex, setIndex, setIndex - 1)
+          onPress={() => {
+            setAdvancedSet([exerciseIndex, setIndex - 1]);
+            setFullWorkout((prev) => {
+              return swapSetsInExercises({fullWorkout: prev, exerciseIndex, setIndexFirst: setIndex, setIndexSecond: setIndex - 1})
+            })}
           }
           variant="secondary"
           style={{ padding: 5 }}
@@ -394,9 +398,12 @@ function commonMoveOptions(ctx: {
       {setIndex !== totalSetsInExercise - 1 && (
         <Button
           title="&darr;"
-          onPress={() =>
-            handleSwapSetsInExercise(exerciseIndex, setIndex, setIndex + 1)
-          }
+          onPress={() => {
+            setAdvancedSet([exerciseIndex, setIndex + 1]);
+            setFullWorkout((prev) => {
+              return swapSetsInExercises({fullWorkout: prev, exerciseIndex, setIndexFirst: setIndex, setIndexSecond: setIndex + 1})
+            })
+          }}
           variant="secondary"
           style={{ padding: 5 }}
           textProps={{ style: { fontSize: 12 } }}
@@ -407,8 +414,8 @@ function commonMoveOptions(ctx: {
   );
 }
 
-function commonSetTypeSelection(ctx: BaseSetEditorCtx) {
-  const { isLoading, allowEditing, set, handleUpdateSetCurried } = ctx;
+function commonSetTypeSelection(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <InlineRow>
       <Text style={{ ...typography.body, marginRight: spacing.md }}>
@@ -423,7 +430,9 @@ function commonSetTypeSelection(ctx: BaseSetEditorCtx) {
           };
         })}
         value={set.set_type}
-        onChange={(v) => handleUpdateSetCurried("set_type", v)}
+        onChange={(v) => setFullWorkout((prev) => {
+          return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'set_type', value: v})
+        })}
         textProps={{ style: typography.body }}
         pressableProps={{
           style: [
@@ -437,8 +446,8 @@ function commonSetTypeSelection(ctx: BaseSetEditorCtx) {
   );
 }
 
-function commonPerformanceTypeSelection(ctx: BaseSetEditorCtx) {
-  const { isLoading, allowEditing, set, handleUpdateSetCurried } = ctx;
+function commonPerformanceTypeSelection(ctx: SetRenderProps<'log'>) {
+  const { isLoading, allowEditing, set, exerciseIndex, setIndex, setFullWorkout } = ctx;
   return (
     <InlineRow>
       <Text style={{ ...typography.body, marginRight: spacing.md }}>
@@ -453,7 +462,16 @@ function commonPerformanceTypeSelection(ctx: BaseSetEditorCtx) {
           ] satisfies { value: LogPerformanceType; label: string }[]
         }
         value={set.performance_type}
-        onChange={(v) => handleUpdateSetCurried("performance_type", v)}
+        onChange={(v) => {
+          if (set.performance_type === 'movement' && v === 'weight') {
+            setFullWorkout((prev) => {
+              return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'distance_per_rep', value: null});
+            })
+          }
+          setFullWorkout((prev) => {
+            return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'performance_type', value: v});
+          })
+        }}
         pressableProps={{
           style: [
             styles.pressableBase,
@@ -468,7 +486,7 @@ function commonPerformanceTypeSelection(ctx: BaseSetEditorCtx) {
 }
 
 function renderWeightSet(ctx: SetRenderProps<"log">): React.JSX.Element | null {
-  const { set, handleUpdateSetCurried, isLoading, allowEditing, ..._rest } =
+  const { set, setFullWorkout, isLoading, allowEditing, ..._rest } =
     ctx;
   if (set.performance_type !== "weight") {
     console.error(`Tried to render ${JSON.stringify(set)} as weight based set`);
@@ -522,11 +540,13 @@ function renderAdvancedWeightSet(
 ): React.JSX.Element | null {
   const {
     set,
-    handleUpdateSetCurried,
+    setFullWorkout,
     isLoading,
     allowEditing,
     isVisible,
     onRequestClose,
+    setIndex,
+    exerciseIndex,
   } = ctx;
   if (set.performance_type !== "weight") {
     console.error(`Tried to render ${JSON.stringify(set)} as weight based set`);
@@ -556,9 +576,9 @@ function renderAdvancedWeightSet(
         <NumberField
           numberValue={set.rest_seconds_before}
           placeholder="sec"
-          onChangeNumber={(value) =>
-            handleUpdateSetCurried("rest_seconds_before", value)
-          }
+          onChangeNumber={(value) => setFullWorkout((prev) => {
+            return updateSetForWorkout({fullWorkout: prev, exerciseIndex, setIndex, key: 'rest_seconds_before', value});
+          })}
           numberType="int"
           style={{
             ...styles.textFieldBase,
@@ -854,13 +874,13 @@ export const logWorkoutStrategy: WorkoutEditorModeStrategy<"log"> = {
       workout,
       allowEditing,
       isLoading,
-      handleUpdateWorkout,
       openDatePicker,
       setOpenDatePicker,
       newSetWeightUnit,
       setNewSetWeightUnit,
       newSetDistanceUnit,
       setNewSetDistanceUnit,
+      setFullWorkout,
     } = ctx;
     return (
       <View>
@@ -935,7 +955,9 @@ export const logWorkoutStrategy: WorkoutEditorModeStrategy<"log"> = {
           <Text style={typography.body}>Duration:</Text>
           <NumberField
             numberValue={workout.duration}
-            onChangeNumber={(value) => handleUpdateWorkout("duration", value)}
+            onChangeNumber={(value) => setFullWorkout((prev) => {
+              return updateWorkoutInWorkout({fullWorkout: prev, key: 'duration', value})
+            })}
             numberType={"float"}
             placeholder={workout.duration_unit}
             placeholderTextColor={colors.placeholderTextColor}
@@ -958,13 +980,15 @@ export const logWorkoutStrategy: WorkoutEditorModeStrategy<"log"> = {
             })}
             value={workout.duration_unit}
             onChange={(u) => {
-              if (workout.duration !== null) {
-                handleUpdateWorkout(
-                  "duration",
-                  changeTimeUnit(workout.duration, workout.duration_unit, u),
-                );
+              const duration = workout.duration;
+              if (duration !== null) {
+                setFullWorkout((prev) => {
+                  return updateWorkoutInWorkout({fullWorkout: prev, key: 'duration', value: changeTimeUnit(duration, workout.duration_unit, u)});
+                })
               }
-              handleUpdateWorkout("duration_unit", u);
+              setFullWorkout((prev) => {
+                return updateWorkoutInWorkout({fullWorkout: prev, key: 'duration_unit', value: u})
+              })
             }}
             disabled={isLoading} // allowing edit here on !allowEdit so we can change display
             pressableProps={{
@@ -980,7 +1004,9 @@ export const logWorkoutStrategy: WorkoutEditorModeStrategy<"log"> = {
           </Text>
           <NumberField
             numberValue={workout.bodyweight}
-            onChangeNumber={(value) => handleUpdateWorkout("bodyweight", value)}
+            onChangeNumber={(value) => setFullWorkout((prev) => {
+              return updateWorkoutInWorkout({fullWorkout: prev, key: 'bodyweight', value})
+            })}
             placeholder={workout.bodyweight_unit}
             placeholderTextColor={colors.placeholderTextColor}
             style={{
@@ -1003,17 +1029,15 @@ export const logWorkoutStrategy: WorkoutEditorModeStrategy<"log"> = {
             })}
             value={workout.bodyweight_unit}
             onChange={(u) => {
-              if (workout.bodyweight !== null) {
-                handleUpdateWorkout(
-                  "bodyweight",
-                  changeWeightUnit(
-                    workout.bodyweight,
-                    workout.bodyweight_unit,
-                    u,
-                  ),
-                );
+              const bw = workout.bodyweight;
+              if (bw !== null) {
+                setFullWorkout((prev) => {
+                  return updateWorkoutInWorkout({fullWorkout: prev, key: 'bodyweight', value: changeWeightUnit(bw, workout.bodyweight_unit, u)})
+                })
               }
-              handleUpdateWorkout("bodyweight_unit", u);
+              setFullWorkout((prev) => {
+                return updateWorkoutInWorkout({fullWorkout: prev, key: 'bodyweight_unit', value: u})
+              })
             }}
             disabled={isLoading} // allowing edit here on !allowEdit so we can change display
             pressableProps={{
@@ -1029,7 +1053,9 @@ export const logWorkoutStrategy: WorkoutEditorModeStrategy<"log"> = {
           visible={openDatePicker}
           onRequestClose={() => setOpenDatePicker(false)}
           selectedDate={workout.completed_on}
-          onSelectDate={(date) => handleUpdateWorkout("completed_on", date)}
+          onSelectDate={(date) => setFullWorkout((prev) => {
+            return updateWorkoutInWorkout({fullWorkout: prev, key: 'completed_on', value: date})
+          })}
         />
       </View>
     );
