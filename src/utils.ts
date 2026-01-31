@@ -319,3 +319,8 @@ export type OmitNever<T, K extends keyof T> = Omit<T, K> & {
   [P in K]?: never;
 };
 export type AllOrNothing<T> = T | { [K in keyof T]: null };
+
+export function avg(nums: number[]): number | null {
+  if (nums.length === 0) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}

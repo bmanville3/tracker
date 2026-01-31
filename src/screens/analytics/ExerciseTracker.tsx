@@ -2,13 +2,74 @@ import { EditableExercise, EditableSet, FullAttachedWorkout, isFullAttachedLogWo
 import { Button, ClosableModal, ModalPicker, Selection } from "@/src/components";
 import { colors, spacing, typography } from "@/src/theme";
 import { EXERCISE_AND_MUSCLE_TAGS, ExerciseAndMuscleTag, ExerciseRow, ISODate, UUID } from "@/src/types";
-import { capitalizeFirstLetter, isSubsetOfArray, maxNullable } from "@/src/utils";
+import { capitalizeFirstLetter, isSubsetOfArray, maxNullable, rgbColorGenerator } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { LineChart } from "react-native-gifted-charts";
+import { LineChart, lineDataItem } from "react-native-gifted-charts";
 import { ExerciseModal } from "../exercise/ExerciseModal";
 import { RPE_TABLE_MODE_TO_E1RM_FUNCTION, RPE_TABLE_MODES, RpeTableMode } from "../RPEChart";
+
+const METRICS = ["sets", "e1rm", "rpe"] as const;
+type Metric = (typeof METRICS)[number];
+
+function metricLabel(m: Metric): string {
+  switch (m) {
+    case "sets": return "Sets";
+    case "e1rm": return "Best e1RM";
+    case "rpe": return "Avg RPE";
+    default: throw new Error(`Unknown metric: ${m}`);
+  }
+}
+
+function metricStyle(m: Metric): { thickness: number; borderStyle: "solid" | "dotted" | "dashed"; strokeDashArray?: number[] } {
+  switch (m) {
+    case "e1rm":
+      return { thickness: 3, borderStyle: 'solid' };
+    case "sets":
+      return { thickness: 2, strokeDashArray: [6, 6], borderStyle: 'dashed' };
+    case "rpe":
+      return { thickness: 100, strokeDashArray: [2, 6], borderStyle: 'dotted' };
+    default:
+      throw new Error(`Unknown metric: ${m}`);
+  }
+}
+
+function Legend({ groups }: { groups: GroupSettings[] }) {
+  return (
+    <View style={{ padding: 8, gap: 10 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        {groups.map((_g, i) => {
+          const c = rgbColorGenerator(i, groups.length);
+          return (
+            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: c }} />
+              <Text>{`Group ${i + 1}`}</Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Metric styles */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
+        {METRICS.map((m) => {
+          const st = metricStyle(m);
+          // We can’t easily draw dashed lines with a simple View in RN,
+          // so label + thickness hint is often enough, OR use an SVG line if you want.
+          return (
+            <View key={m} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ width: 24, borderWidth: 1, borderColor: "#444", borderStyle: st.borderStyle }} />
+              <Text>{metricLabel(m)}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+type GraphPoint = lineDataItem & { raw: number };
+
 
 function e1rmForSetLog(args: {
   ss: EditableSet<'log'>;
@@ -18,19 +79,6 @@ function e1rmForSetLog(args: {
   if (ss.weight == null || ss.reps == null) return null;
   const fn = RPE_TABLE_MODE_TO_E1RM_FUNCTION[mode];
   return fn(ss.weight, ss.reps, ss.rpe);
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
-}
-
-function combineE1RM(values: Map<UUID, number>): [UUID, number] | null {
-  const nums = [...values.entries()].filter((entry): entry is [UUID, number] => entry[1] !== null);
-  if (nums.length === 0) return null;
-  const maxIndex = nums.reduce((iMax, item, i, arr) => {
-    return item[1] > arr[iMax][1] ? i : iMax;
-  }, 0)
-  return nums[maxIndex];
 }
 
 export type ExerciseTrackerProps = (
@@ -168,6 +216,58 @@ function extractDataToGraph(settings: GroupSettings, workouts: FullAttachedWorko
   return finalMapping;
 }
 
+function buildSeriesForGroupMetric(
+  allDates: Map<ISODate, Map<UUID, DataToGraph>>,
+  metric: Metric,
+): GraphPoint[] {
+  const dates = [...allDates.keys()].sort();
+
+  return dates.flatMap((date) => {
+    const exMap = allDates.get(date);
+    if (!exMap) return [];
+
+    let raw: number | null = null;
+
+    if (metric === "sets") {
+      raw = 0;
+      for (const d of exMap.values()) raw += d.numberOfSets;
+    } else if (metric === "e1rm") {
+      for (const d of exMap.values()) {
+        if (d.bestE1RM != null) {
+          raw = raw == null ? d.bestE1RM : Math.max(raw, d.bestE1RM);
+        }
+      }
+    } else {
+      let sum = 0;
+      let n = 0;
+      for (const d of exMap.values()) {
+        for (const r of d.rpesLogged) { sum += r; n += 1; }
+      }
+      raw = n === 0 ? null : sum / n;
+    }
+
+    if (raw == null) return [];
+    return [{ label: date, value: raw, raw }];
+  });
+}
+
+function minMaxNormalize(x: number, min: number, max: number): number {
+  if (max === min) return 0.5; // flat line; put it in the middle
+  return (x - min) / (max - min);
+}
+
+function computeMinMax(points: GraphPoint[]): { min: number; max: number } | null {
+  if (points.length === 0) return null;
+  let min = points[0].raw;
+  let max = points[0].raw;
+  for (const p of points) {
+    min = Math.min(min, p.raw);
+    max = Math.max(max, p.raw);
+  }
+  return { min, max };
+}
+
+
 export function ExerciseTracker(props: ExerciseTrackerProps) {
   const {
     trackOverWorkouts
@@ -182,7 +282,8 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
   const [seeAllExercises, setSeeAllExercises] = useState<boolean>(false);
   const [filterAllExercisesByTags, setFilterAllExercisesByTags] = useState<ExerciseAndMuscleTag[]>([]);
   const [showGroupsToAddTo, setShowGroupsToAddTo] = useState<boolean>(false);
-  const [applyNormalization, setApplyNormalization] = useState<boolean>(false);
+  const [applyNormalization, setApplyNormalization] = useState<boolean>(true);
+  const [applyNormalizationPerGlobalMetric, setApplyNormalizationGlobalMetric] = useState<boolean>(true);
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<number | null>(null);
   const [confirmDeleteAllGroups, setConfirmDeleteAllGroups] = useState<boolean>(false);
 
@@ -454,6 +555,18 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
             }}/>
           </>)}
         </View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            ...styles.containerStyle,
+            gap: spacing.sm,
+          }}
+        >
+          <Selection title="Track E1RM" isSelected={group.includeRawGraph} onPress={() => updateGroup(groupIndex, {includeRawGraph: !group.includeRawGraph})}/>
+          <Selection title="Track Avg. RPE" isSelected={group.includeRpeGraph} onPress={() => updateGroup(groupIndex, {includeRpeGraph: !group.includeRpeGraph})}/>
+          <Selection title="Track Volume" isSelected={group.includeVolumeGraph} onPress={() => updateGroup(groupIndex, {includeVolumeGraph: !group.includeVolumeGraph})}/>
+        </View>
       </View>
     </View>
   }
@@ -480,13 +593,16 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
   }
 
   const renderAllGroupsGraphData = () => {
-    if (!isLogWorkouts) {
-      return null;
+    if (!isLogWorkouts) return null;
+    if (groups.length === 0) {
+      return <Text style={typography.hint}>Add groups to track exercise(s)</Text>
     }
-    
-    // each index corresponds to a group
-    // each date corresponds to a map of exercises in that group and data
+    if (!groups.some(g => g.exercises.size > 0)) {
+      return <Text style={typography.hint}>Add exercises to groups for tracking</Text>
+    }
+
     const fullDataLayout: Map<ISODate, Map<UUID, DataToGraph>>[] = [];
+
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
       const reduced = reduceWorkoutsForGroup(groupIndex) as FullAttachedWorkout<"log">[];
       if (reduced.length === 0) {
@@ -494,20 +610,101 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
         continue;
       }
       const group = groups[groupIndex];
-      fullDataLayout.push(extractDataToGraph(group, reduced))
+      fullDataLayout.push(extractDataToGraph(group, reduced));
     }
-    return <ScrollView horizontal>
-      <LineChart
-      
-      />
-    </ScrollView>
-  }
+
+    type SeriesKey = `${number}-${Metric}`; // groupIndex-metric
+
+    const seriesByKey = new Map<SeriesKey, GraphPoint[]>();
+
+    // build raw series first
+    for (let groupIndex = 0; groupIndex < fullDataLayout.length; groupIndex++) {
+      const allDates = fullDataLayout[groupIndex];
+      for (const metric of METRICS) {
+        if (!groups[groupIndex].includeRawGraph && metric === 'e1rm') {
+          continue;
+        }
+        if (!groups[groupIndex].includeRpeGraph && metric === 'rpe') {
+          continue;
+        }
+        if (!groups[groupIndex].includeVolumeGraph && metric === 'sets') {
+          continue;
+        }
+        const key = `${groupIndex}-${metric}` as const;
+        seriesByKey.set(key, buildSeriesForGroupMetric(allDates, metric));
+      }
+    }
+
+    const perMetricMinMax = new Map<Metric, { min: number; max: number }>();
+
+    if (applyNormalization && applyNormalizationPerGlobalMetric) {
+      for (const metric of METRICS) {
+        const allPoints = [...seriesByKey.entries()]
+          .filter(([k]) => k.endsWith(`-${metric}`))
+          .flatMap(([, pts]) => pts);
+        const mm = computeMinMax(allPoints);
+        if (mm) perMetricMinMax.set(metric, mm);
+      }
+    }
+
+    const dataSet = fullDataLayout.flatMap((_, groupIndex) => {
+      const groupColor = rgbColorGenerator(groupIndex, groups.length);
+
+      return METRICS.map((metric) => {
+        const key = `${groupIndex}-${metric}` as const;
+        const rawSeries = seriesByKey.get(key) ?? [];
+
+        let normalizedSeries: lineDataItem[] = rawSeries;
+
+        if (applyNormalization) {
+          const mm =
+            applyNormalizationPerGlobalMetric
+              ? perMetricMinMax.get(metric) ?? null
+              : computeMinMax(rawSeries);
+
+          if (mm) {
+            normalizedSeries = rawSeries.map((p) => ({
+              ...p,
+              value: minMaxNormalize(p.raw, mm.min, mm.max),
+              raw: p.raw,
+            }));
+          }
+        }
+
+        const style = metricStyle(metric);
+
+        return {
+          data: normalizedSeries,
+          color: groupColor,
+          thickness: style.thickness,
+          strokeDashArray: style.strokeDashArray,
+        };
+      });
+    });
+
+    const allDateLabels = Array.from(
+      new Set(fullDataLayout.flatMap((m) => [...m.keys()])),
+    ).sort();
+
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View>
+          <Legend groups={groups} />
+          <LineChart
+            dataSet={dataSet}
+          />
+        </View>
+      </ScrollView>
+    );
+  };
 
   const renderWorkoutsMetadata = () => {
     const allExerciseInWorkoutFiltered = [...allExerciseInWorkout.values()].filter(e => isSubsetOfArray(filterAllExercisesByTags, e.tags));
     return <View>
       <View style={{ ...styles.containerStyle, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm}}>
-        <Text style={{...typography.body}}>Tracking over {trackOverWorkouts.length} workout</Text>
+        <Text style={{...typography.body}}>Tracking over {trackOverWorkouts.length} workout{trackOverWorkouts.length === 1 ? '' : 's'}</Text>
+        <Selection title={"Normalize"} isSelected={applyNormalization} onPress={() => setApplyNormalization((prev) => !prev)}/>
+        {applyNormalization && <Selection title="Per Group" isSelected={!applyNormalizationPerGlobalMetric} onPress={() => setApplyNormalizationGlobalMetric(prev => !prev)}/>}
         <Text style={{...typography.body, marginLeft: 'auto'}}>See All Exercises</Text>
         <Feather
           name={
@@ -555,7 +752,7 @@ export function ExerciseTracker(props: ExerciseTrackerProps) {
                 } else {
                   return <Button
                     key={`${ex.id}-${gI}`}
-                    title={`Add to Group ${gI + 1}`}
+                    title={`+Group ${gI + 1}`}
                     onPress={() => addExercisesToGroup(gI, [ex])}
                     {...styles.smallButton}
                   />
