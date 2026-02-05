@@ -14,7 +14,13 @@ import {
   WorkoutLogRow,
   WorkoutTemplateRow,
 } from "../types";
-import { AllOrNothing, arraysEqual, doubleArraysEqual, OmitNever, showAlert } from "../utils";
+import {
+  AllOrNothing,
+  arraysEqual,
+  doubleArraysEqual,
+  OmitNever,
+  showAlert,
+} from "../utils";
 
 export type WorkoutEditorMode = "template" | "log";
 
@@ -29,28 +35,46 @@ export type EditableProgramFields<M extends WorkoutEditorMode> =
   M extends "template" ? CompleteProgram : AllOrNothing<CompleteProgram>;
 
 export type ModeTypes<M extends WorkoutEditorMode> = M extends "template"
-  ?
-    {
-      WorkoutRow: Omit<WorkoutTemplateRow, "id" | keyof AssociatedProgramFields> & EditableProgramFields<M> & { id?: never };
-      WorkoutExerciseRow: OmitNever<WorkoutExerciseTemplateRow, "id" | "workout_id" | "exercise_id" | "exercise_index"> & { exercise: ExerciseRow };
-      WorkoutExerciseSetRow: OmitNever<WorkoutExerciseSetTemplateRow, "id" | "workout_exercise_id" | "set_index">;
+  ? {
+      WorkoutRow: Omit<
+        WorkoutTemplateRow,
+        "id" | keyof AssociatedProgramFields
+      > &
+        EditableProgramFields<M> & { id?: never };
+      WorkoutExerciseRow: OmitNever<
+        WorkoutExerciseTemplateRow,
+        "id" | "workout_id" | "exercise_id" | "exercise_index"
+      > & { exercise: ExerciseRow };
+      WorkoutExerciseSetRow: OmitNever<
+        WorkoutExerciseSetTemplateRow,
+        "id" | "workout_exercise_id" | "set_index"
+      >;
     }
-  : 
-    {
-      WorkoutRow: Omit<WorkoutLogRow, "id" | keyof AssociatedProgramFields> & EditableProgramFields<M> & { id?: never };
-      WorkoutExerciseRow: OmitNever<WorkoutExerciseLogRow, "id" | "workout_id" | "exercise_id" | "exercise_index"> & { exercise: ExerciseRow };
-      WorkoutExerciseSetRow: OmitNever<WorkoutExerciseSetLogRow, "id" | "workout_exercise_id" | "set_index">;
-  };
+  : {
+      WorkoutRow: Omit<WorkoutLogRow, "id" | keyof AssociatedProgramFields> &
+        EditableProgramFields<M> & { id?: never };
+      WorkoutExerciseRow: OmitNever<
+        WorkoutExerciseLogRow,
+        "id" | "workout_id" | "exercise_id" | "exercise_index"
+      > & { exercise: ExerciseRow };
+      WorkoutExerciseSetRow: OmitNever<
+        WorkoutExerciseSetLogRow,
+        "id" | "workout_exercise_id" | "set_index"
+      >;
+    };
 
-export type EditableWorkout<M extends WorkoutEditorMode> = ModeTypes<M>["WorkoutRow"];
-export type EditableExercise<M extends WorkoutEditorMode> = ModeTypes<M>["WorkoutExerciseRow"];
-export type EditableSet<M extends WorkoutEditorMode> = ModeTypes<M>["WorkoutExerciseSetRow"];
+export type EditableWorkout<M extends WorkoutEditorMode> =
+  ModeTypes<M>["WorkoutRow"];
+export type EditableExercise<M extends WorkoutEditorMode> =
+  ModeTypes<M>["WorkoutExerciseRow"];
+export type EditableSet<M extends WorkoutEditorMode> =
+  ModeTypes<M>["WorkoutExerciseSetRow"];
 
 export type FullDetachedWorkoutForMode<M extends WorkoutEditorMode> = {
   workout: EditableWorkout<M>;
   exercises: EditableExercise<M>[];
   sets: EditableSet<M>[][];
-}
+};
 
 export function isLogWorkout(
   w: EditableWorkout<WorkoutEditorMode>,
@@ -197,7 +221,10 @@ export function fullDetachedWorkoutEqual(
 
   if (isFullDetachedLogWorkout(a) && isFullDetachedLogWorkout(b)) {
     // nothing to do here yet
-  } else if (isFullDetachedTemplateWorkout(a) && isFullDetachedTemplateWorkout(b)) {
+  } else if (
+    isFullDetachedTemplateWorkout(a) &&
+    isFullDetachedTemplateWorkout(b)
+  ) {
     // nothing to do here yet
   } else {
     console.error(`Got different detached full workout types:\n\t${a}\n\t${b}`);
@@ -225,9 +252,10 @@ export function workoutHasProgram(
   return w.program_row !== null;
 }
 
-export type FullAttachedWorkout<M extends WorkoutEditorMode> = FullDetachedWorkoutForMode<M> & {
-  workoutId: UUID;
-};
+export type FullAttachedWorkout<M extends WorkoutEditorMode> =
+  FullDetachedWorkoutForMode<M> & {
+    workoutId: UUID;
+  };
 
 export function isFullAttachedLogWorkout(
   fw: FullAttachedWorkout<WorkoutEditorMode>,
@@ -261,7 +289,10 @@ export function isFullAttachedTemplateWorkouts(
 
 function logOob(ctx: string, details: Record<string, unknown>): void {
   console.error(`[workout-bounds] ${ctx}`, details);
-  showAlert("A bounds error was caught when trying to edit the workout. You should try to save your progress and refresh the page.", `[workout-bounds] ${ctx}`);
+  showAlert(
+    "A bounds error was caught when trying to edit the workout. You should try to save your progress and refresh the page.",
+    `[workout-bounds] ${ctx}`,
+  );
 }
 
 function checkExercisesSetsSameLength<M extends WorkoutEditorMode>(
@@ -349,7 +380,6 @@ export function addSetToWorkout<M extends WorkoutEditorMode>(args: {
   return { ...fullWorkout, sets: nextSets };
 }
 
-
 export function removeSetFromWorkout<M extends WorkoutEditorMode>(args: {
   fullWorkout: FullDetachedWorkoutForMode<M>;
   exerciseIndex: number;
@@ -357,11 +387,15 @@ export function removeSetFromWorkout<M extends WorkoutEditorMode>(args: {
 }): FullDetachedWorkoutForMode<M> {
   const { fullWorkout, exerciseIndex, setIndex } = args;
 
-  if (!checkSetIndex("removeSetFromWorkout", fullWorkout, exerciseIndex, setIndex)) {
+  if (
+    !checkSetIndex("removeSetFromWorkout", fullWorkout, exerciseIndex, setIndex)
+  ) {
     return fullWorkout;
   }
 
-  const nextSetsForExercise = fullWorkout.sets[exerciseIndex].filter((_s, i) => i !== setIndex);
+  const nextSetsForExercise = fullWorkout.sets[exerciseIndex].filter(
+    (_s, i) => i !== setIndex,
+  );
   const nextSets = fullWorkout.sets.map((s, i) =>
     i === exerciseIndex ? nextSetsForExercise : s,
   );
@@ -371,7 +405,7 @@ export function removeSetFromWorkout<M extends WorkoutEditorMode>(args: {
 
 export function updateSetForWorkout<
   M extends WorkoutEditorMode,
-  K extends keyof EditableSet<M>
+  K extends keyof EditableSet<M>,
 >(args: {
   fullWorkout: FullDetachedWorkoutForMode<M>;
   exerciseIndex: number;
@@ -381,7 +415,9 @@ export function updateSetForWorkout<
 }): FullDetachedWorkoutForMode<M> {
   const { fullWorkout, exerciseIndex, setIndex, key, value } = args;
 
-  if (!checkSetIndex("updateSetForWorkout", fullWorkout, exerciseIndex, setIndex)) {
+  if (
+    !checkSetIndex("updateSetForWorkout", fullWorkout, exerciseIndex, setIndex)
+  ) {
     return fullWorkout;
   }
 
@@ -408,10 +444,24 @@ export function swapSetsInExercises<M extends WorkoutEditorMode>(args: {
 }): FullDetachedWorkoutForMode<M> {
   const { fullWorkout, exerciseIndex, setIndexFirst, setIndexSecond } = args;
 
-  if (!checkSetIndex("swapSetsInExercises: setIndexFirst", fullWorkout, exerciseIndex, setIndexFirst)) {
+  if (
+    !checkSetIndex(
+      "swapSetsInExercises: setIndexFirst",
+      fullWorkout,
+      exerciseIndex,
+      setIndexFirst,
+    )
+  ) {
     return fullWorkout;
   }
-  if (!checkSetIndex("swapSetsInExercises: setIndexSecond", fullWorkout, exerciseIndex, setIndexSecond)) {
+  if (
+    !checkSetIndex(
+      "swapSetsInExercises: setIndexSecond",
+      fullWorkout,
+      exerciseIndex,
+      setIndexSecond,
+    )
+  ) {
     return fullWorkout;
   }
   if (setIndexFirst === setIndexSecond) {
@@ -446,13 +496,21 @@ export function addExerciseToWorkout<M extends WorkoutEditorMode>(args: {
   };
 }
 
-export function removeExerciseFromWorkoutByIndex<M extends WorkoutEditorMode>(args: {
+export function removeExerciseFromWorkoutByIndex<
+  M extends WorkoutEditorMode,
+>(args: {
   fullWorkout: FullDetachedWorkoutForMode<M>;
   exerciseIndex: number;
 }): FullDetachedWorkoutForMode<M> {
   const { fullWorkout, exerciseIndex } = args;
 
-  if (!checkExerciseIndex("removeExerciseFromWorkoutByIndex", fullWorkout, exerciseIndex)) {
+  if (
+    !checkExerciseIndex(
+      "removeExerciseFromWorkoutByIndex",
+      fullWorkout,
+      exerciseIndex,
+    )
+  ) {
     return fullWorkout;
   }
 
@@ -463,7 +521,9 @@ export function removeExerciseFromWorkoutByIndex<M extends WorkoutEditorMode>(ar
   };
 }
 
-export function removeExerciseFromWorkoutById<M extends WorkoutEditorMode>(args: {
+export function removeExerciseFromWorkoutById<
+  M extends WorkoutEditorMode,
+>(args: {
   fullWorkout: FullDetachedWorkoutForMode<M>;
   exerciseId: UUID;
 }): FullDetachedWorkoutForMode<M> {
@@ -496,7 +556,9 @@ export function updateExerciseForWorkout<
 }): FullDetachedWorkoutForMode<M> {
   const { fullWorkout, exerciseIndex, key, value } = args;
 
-  if (!checkExerciseIndex("updateExerciseForWorkout", fullWorkout, exerciseIndex)) {
+  if (
+    !checkExerciseIndex("updateExerciseForWorkout", fullWorkout, exerciseIndex)
+  ) {
     return fullWorkout;
   }
 
@@ -534,10 +596,22 @@ export function swapExercisesInWorkout<M extends WorkoutEditorMode>(args: {
 }): FullDetachedWorkoutForMode<M> {
   const { fullWorkout, exerciseIndexFirst, exerciseIndexSecond } = args;
 
-  if (!checkExerciseIndex("swapExercisesInWorkout: exerciseIndexFirst", fullWorkout, exerciseIndexFirst)) {
+  if (
+    !checkExerciseIndex(
+      "swapExercisesInWorkout: exerciseIndexFirst",
+      fullWorkout,
+      exerciseIndexFirst,
+    )
+  ) {
     return fullWorkout;
   }
-  if (!checkExerciseIndex("swapExercisesInWorkout: exerciseIndexSecond", fullWorkout, exerciseIndexSecond)) {
+  if (
+    !checkExerciseIndex(
+      "swapExercisesInWorkout: exerciseIndexSecond",
+      fullWorkout,
+      exerciseIndexSecond,
+    )
+  ) {
     return fullWorkout;
   }
   if (exerciseIndexFirst === exerciseIndexSecond) {
@@ -559,7 +633,7 @@ export function swapExercisesInWorkout<M extends WorkoutEditorMode>(args: {
 
 export function updateWorkoutInWorkout<
   M extends WorkoutEditorMode,
-  K extends keyof EditableWorkout<M>
+  K extends keyof EditableWorkout<M>,
 >(args: {
   fullWorkout: FullDetachedWorkoutForMode<M>;
   key: K;

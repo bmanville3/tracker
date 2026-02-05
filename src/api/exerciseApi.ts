@@ -242,13 +242,15 @@ export async function searchExercises(
     tags = new Set();
   }
 
-  const allExercisesMap = await (fetchExercises().then((rows) => {
+  const allExercisesMap = await fetchExercises().then((rows) => {
     if (limitToExerciseIds) {
-      return new Map([...rows.entries()].filter(([id, _r]) => limitToExerciseIds.has(id)));
+      return new Map(
+        [...rows.entries()].filter(([id, _r]) => limitToExerciseIds.has(id)),
+      );
     } else {
       return rows;
     }
-  }));
+  });
   let allExercises = Array.from(
     [...allExercisesMap.values()].filter((ex) =>
       isSubsetOf(tags, new Set(ex.tags)),

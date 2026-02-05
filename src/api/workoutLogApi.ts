@@ -10,7 +10,13 @@ import {
   WorkoutExerciseSetLogRow,
   WorkoutLogRow,
 } from "../types";
-import { AllOrNothing, anyErrorToString, OmitNever, requireGetUser, showAlert } from "../utils";
+import {
+  AllOrNothing,
+  anyErrorToString,
+  OmitNever,
+  requireGetUser,
+  showAlert,
+} from "../utils";
 import { EXERCISE_CACHE_NAME, fetchExercises } from "./exerciseApi";
 import {
   EditableExercise,
@@ -24,45 +30,54 @@ export const FULL_WORKOUT_LOG_CACHE_NAME = "fullWorkoutLogCache";
 /**
  * A mapping of WorkoutLogRow.UUIDs to FullAttachedWorkout<'log'>
  */
-const FULL_WORKOUT_LOG_CACHE =
-  CACHE_FACTORY.getOrCreateSwrKeyedCache<FullAttachedWorkout<'log'>>(
-    FULL_WORKOUT_LOG_CACHE_NAME,
-    null,
-  );
+const FULL_WORKOUT_LOG_CACHE = CACHE_FACTORY.getOrCreateSwrKeyedCache<
+  FullAttachedWorkout<"log">
+>(FULL_WORKOUT_LOG_CACHE_NAME, null);
 
-export const WORKOUT_LOG_HEADER_CACHE_NAME = 'workoutLogHeaderCache';
+export const WORKOUT_LOG_HEADER_CACHE_NAME = "workoutLogHeaderCache";
 // a user would realistically do 5 workouts a week * 52 weeks a year = 120 workouts a year
 // workout log rows are actually small so we will do this so we do not have to worry about
 // overlapping queries on the database (fetching date ranges, fetching last N workouts, etc)
 /**
  * A user database cache of the workout_log table.
  */
-const WORKOUT_LOG_HEADER_CACHE = CACHE_FACTORY.getOrCreateSwrIdCache<WorkoutLogRow>(WORKOUT_LOG_HEADER_CACHE_NAME, null);
-
+const WORKOUT_LOG_HEADER_CACHE =
+  CACHE_FACTORY.getOrCreateSwrIdCache<WorkoutLogRow>(
+    WORKOUT_LOG_HEADER_CACHE_NAME,
+    null,
+  );
 
 CACHE_FACTORY.subscribe(async (e) => {
-  if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'write' && e.key !== undefined) {
+  if (
+    e.cacheName === EXERCISE_CACHE_NAME &&
+    e.type === "write" &&
+    e.key !== undefined
+  ) {
     const newExercise = (await fetchExercises()).get(e.key);
     if (!newExercise) {
-      console.error(`Got write commit but ${e.key} could not be found in new exercises`);
+      console.error(
+        `Got write commit but ${e.key} could not be found in new exercises`,
+      );
       return;
     }
-    const workoutsToUpdate: Map<UUID, FullAttachedWorkout<'log'>> = new Map();
-    FULL_WORKOUT_LOG_CACHE.getInnerMap().forEach(workout => {
+    const workoutsToUpdate: Map<UUID, FullAttachedWorkout<"log">> = new Map();
+    FULL_WORKOUT_LOG_CACHE.getInnerMap().forEach((workout) => {
       if (workout.exercises.some((ex) => ex.exercise.id === e.key)) {
-        workoutsToUpdate.set(workout.workoutId, {...workout, exercises: workout.exercises.map((ex) => {
-          if (ex.exercise.id === e.key) {
-            return {...ex, exercise: newExercise}
-          } else {
-            return ex;
-          }
-        })})
+        workoutsToUpdate.set(workout.workoutId, {
+          ...workout,
+          exercises: workout.exercises.map((ex) => {
+            if (ex.exercise.id === e.key) {
+              return { ...ex, exercise: newExercise };
+            } else {
+              return ex;
+            }
+          }),
+        });
       }
     });
     FULL_WORKOUT_LOG_CACHE.setAll(workoutsToUpdate);
   }
 });
-
 
 export function databaseRowToWorkoutLogRow(
   data: Database["public"]["Tables"]["workout_log"]["Row"],
@@ -112,11 +127,13 @@ export function databaseRowsToWorkoutLogRows(
   return [...data.map((d) => databaseRowToWorkoutLogRow(d))];
 }
 
-export async function fetchAllWorkoutLogHeaders(): Promise<Map<UUID, WorkoutLogRow>> {
+export async function fetchAllWorkoutLogHeaders(): Promise<
+  Map<UUID, WorkoutLogRow>
+> {
   return WORKOUT_LOG_HEADER_CACHE.fetch(async () => {
-    const { data, error } = await supabase.from('workout_log').select('*');
+    const { data, error } = await supabase.from("workout_log").select("*");
     if (error) throw error;
-    return databaseRowsToWorkoutLogRows(data)
+    return databaseRowsToWorkoutLogRows(data);
   });
 }
 
@@ -140,7 +157,9 @@ export async function upsertWorkoutLog(ctx: {
   const { workout, exercises, sets } = payload;
   const { user_id, program_row, ...baseWorkout } = workout;
   if (user_id && user_id !== user.user_id) {
-    throw new Error(`Tried to upsert with user_id=${user_id} but user.user_id=${user.user_id}`);
+    throw new Error(
+      `Tried to upsert with user_id=${user_id} but user.user_id=${user.user_id}`,
+    );
   }
 
   let payloadProgram: AllOrNothing<AssociatedProgramFields>;
@@ -164,13 +183,11 @@ export async function upsertWorkoutLog(ctx: {
   let command;
   let oldExerciseWorkoutsBeforeInsert: WorkoutExerciseLogRow[] | null = null;
   if (workoutLogId) {
-    const {
-      data: oldExerciseWorkouts,
-      error: selectOldExerciseWorkoutsErr,
-    } = await supabase
-      .from("workout_exercise_log")
-      .select("*")
-      .eq("workout_id", workoutLogId);
+    const { data: oldExerciseWorkouts, error: selectOldExerciseWorkoutsErr } =
+      await supabase
+        .from("workout_exercise_log")
+        .select("*")
+        .eq("workout_id", workoutLogId);
     if (selectOldExerciseWorkoutsErr) {
       // nothing udpate
       showAlert(
@@ -209,17 +226,17 @@ export async function upsertWorkoutLog(ctx: {
   let runAfter: () => void = () => {};
   try {
     const exercisePayload: OmitNever<WorkoutExerciseLogRow, "id">[] =
-    exercises.map((ex, i) => {
-      const { exercise, notes, superset_group } = ex;
+      exercises.map((ex, i) => {
+        const { exercise, notes, superset_group } = ex;
 
-      return {
-        exercise_id: exercise.id,
-        exercise_index: i,
-        workout_id: workoutLogRow.id,
-        notes,
-        superset_group,
-      } satisfies OmitNever<WorkoutExerciseLogRow, "id">;
-    });
+        return {
+          exercise_id: exercise.id,
+          exercise_index: i,
+          workout_id: workoutLogRow.id,
+          notes,
+          superset_group,
+        } satisfies OmitNever<WorkoutExerciseLogRow, "id">;
+      });
 
     const { data: insertedExercises, error: exerciseInsertionErr } =
       await supabase
@@ -265,18 +282,24 @@ export async function upsertWorkoutLog(ctx: {
       if (deleteOldExercises) throw deleteOldExercises;
     }
     runAfter = () => {
-      FULL_WORKOUT_LOG_CACHE.set(workoutLogRow.id, {...payload, workoutId: workoutLogRow.id});
-    }
+      FULL_WORKOUT_LOG_CACHE.set(workoutLogRow.id, {
+        ...payload,
+        workoutId: workoutLogRow.id,
+      });
+    };
     return [true, workoutLogRow.id];
   } catch (e) {
-    showAlert("Error updating workout", anyErrorToString(e, 'Unknown error'));
+    showAlert("Error updating workout", anyErrorToString(e, "Unknown error"));
     // partial state too hard to recover from -> force refetch next fetch
     runAfter = () => {
       FULL_WORKOUT_LOG_CACHE.delete(workoutLogRow.id);
-    }
+    };
     return [false, workoutLogRow.id];
   } finally {
-    WORKOUT_LOG_HEADER_CACHE.upsert(databaseRowToWorkoutLogRow(workoutLogRow), runAfter);
+    WORKOUT_LOG_HEADER_CACHE.upsert(
+      databaseRowToWorkoutLogRow(workoutLogRow),
+      runAfter,
+    );
   }
 }
 
@@ -295,11 +318,18 @@ export async function deleteWorkoutLog(workoutId: UUID): Promise<void> {
 function buildFullWorkoutFromAllBatch(
   workoutLogRow: WorkoutLogRow,
   allProgramRows: Map<UUID, ProgramRow>,
-  allExerciseWorkouts: Map<UUID, Database["public"]["Tables"]["workout_exercise_log"]["Row"][]>,
-  allSetRows: Map<UUID, Database["public"]["Tables"]["workout_exercise_set_log"]["Row"][]>,
-  allExercises: Map<UUID, ExerciseRow>
-): FullAttachedWorkout<'log'> {
-  const filteredExerciseWorkouts = allExerciseWorkouts.get(workoutLogRow.id) ?? [];
+  allExerciseWorkouts: Map<
+    UUID,
+    Database["public"]["Tables"]["workout_exercise_log"]["Row"][]
+  >,
+  allSetRows: Map<
+    UUID,
+    Database["public"]["Tables"]["workout_exercise_set_log"]["Row"][]
+  >,
+  allExercises: Map<UUID, ExerciseRow>,
+): FullAttachedWorkout<"log"> {
+  const filteredExerciseWorkouts =
+    allExerciseWorkouts.get(workoutLogRow.id) ?? [];
 
   const sortedExWrkRows = filteredExerciseWorkouts.sort(
     (a, b) => a.exercise_index - b.exercise_index,
@@ -318,7 +348,9 @@ function buildFullWorkoutFromAllBatch(
 
   const editableSets: EditableSet<"log">[][] = sortedExWrkRows.map((exWrk) => {
     // TODO: have to cast here because DB typing is not strict enough
-    const rows: WorkoutExerciseSetLogRow[] = (allSetRows.get(exWrk.id) as (WorkoutExerciseSetLogRow[] | undefined)) ?? [];
+    const rows: WorkoutExerciseSetLogRow[] =
+      (allSetRows.get(exWrk.id) as WorkoutExerciseSetLogRow[] | undefined) ??
+      [];
     return rows
       .sort((a, b) => a.set_index - b.set_index)
       .map((r) => {
@@ -336,7 +368,10 @@ function buildFullWorkoutFromAllBatch(
     day_in_week,
     ...restWrkLogRow
   } = workoutLogRow;
-  const programRow = workoutLogRow.program_id !== null ? (allProgramRows.get(workoutLogRow.program_id) ?? null) : null;
+  const programRow =
+    workoutLogRow.program_id !== null
+      ? (allProgramRows.get(workoutLogRow.program_id) ?? null)
+      : null;
   if (programRow !== null && block_in_program !== null) {
     editableWorkout = {
       ...restWrkLogRow,
@@ -369,10 +404,10 @@ function buildFullWorkoutFromAllBatch(
 
 export async function fullAttachedWorkoutLogFromWorkoutLogIds(
   workoutIds: UUID[],
-): Promise<Map<UUID, FullAttachedWorkout<'log'>>> {
+): Promise<Map<UUID, FullAttachedWorkout<"log">>> {
   const uniqueWorkoutIds = [...new Set(workoutIds)];
   let idsToFetch: UUID[] = [];
-  const completed: Map<UUID, FullAttachedWorkout<'log'>> = new Map();
+  const completed: Map<UUID, FullAttachedWorkout<"log">> = new Map();
   uniqueWorkoutIds.forEach((id) => {
     const workoutMaybe = FULL_WORKOUT_LOG_CACHE.peek(id);
     if (workoutMaybe) {
@@ -391,7 +426,9 @@ export async function fullAttachedWorkoutLogFromWorkoutLogIds(
     return present;
   });
   if (idsToFetch.length === 0) return completed;
-  const workoutLogRows: WorkoutLogRow[] = idsToFetch.map((id) => allWorkoutLogRows.get(id)!);
+  const workoutLogRows: WorkoutLogRow[] = idsToFetch.map(
+    (id) => allWorkoutLogRows.get(id)!,
+  );
 
   const { data: allExerciseWorkouts, error: exWkErr } = await supabase
     .from("workout_exercise_log")
@@ -407,32 +444,45 @@ export async function fullAttachedWorkoutLogFromWorkoutLogIds(
     }
   });
 
-  const pIds: UUID[] = [... new Set(workoutLogRows.map((w) => w.program_id).filter((pId) => pId !== null))];
-  
+  const pIds: UUID[] = [
+    ...new Set(
+      workoutLogRows.map((w) => w.program_id).filter((pId) => pId !== null),
+    ),
+  ];
+
   let allProgramRows: ProgramRow[] = [];
   if (pIds.length > 0) {
     const { data: allProgramRowsFromDb, error: prgError } = await supabase
-      .from('program')
-      .select('*')
-      .in('id', pIds);
+      .from("program")
+      .select("*")
+      .in("id", pIds);
     if (prgError) throw prgError;
     allProgramRows = allProgramRowsFromDb satisfies ProgramRow[];
   }
 
   const { data: allSetExerciseWorkouts, error: setErr } = await supabase
     .from("workout_exercise_set_log")
-    .select('*')
-    .in('workout_exercise_id', allExerciseWorkouts.map((ex) => ex.id))
+    .select("*")
+    .in(
+      "workout_exercise_id",
+      allExerciseWorkouts.map((ex) => ex.id),
+    );
   if (setErr) throw setErr;
 
-  const exByWorkout = new Map<UUID, Database["public"]["Tables"]["workout_exercise_log"]["Row"][]>();
+  const exByWorkout = new Map<
+    UUID,
+    Database["public"]["Tables"]["workout_exercise_log"]["Row"][]
+  >();
   for (const ex of allExerciseWorkouts) {
     const arr = exByWorkout.get(ex.workout_id);
     if (arr) arr.push(ex);
     else exByWorkout.set(ex.workout_id, [ex]);
   }
 
-  const setsByExWk = new Map<UUID, Database["public"]["Tables"]["workout_exercise_set_log"]["Row"][]>();
+  const setsByExWk = new Map<
+    UUID,
+    Database["public"]["Tables"]["workout_exercise_set_log"]["Row"][]
+  >();
   for (const s of allSetExerciseWorkouts) {
     const arr = setsByExWk.get(s.workout_exercise_id);
     if (arr) arr.push(s);
@@ -444,18 +494,25 @@ export async function fullAttachedWorkoutLogFromWorkoutLogIds(
 
   const newlyCompleted = new Map();
   workoutLogRows.forEach((w) => {
-    const fullWorkout = buildFullWorkoutFromAllBatch(w, programById, exByWorkout, setsByExWk, allExercises);
+    const fullWorkout = buildFullWorkoutFromAllBatch(
+      w,
+      programById,
+      exByWorkout,
+      setsByExWk,
+      allExercises,
+    );
     completed.set(w.id, fullWorkout);
     newlyCompleted.set(w.id, fullWorkout);
-  })
+  });
   FULL_WORKOUT_LOG_CACHE.setAll(newlyCompleted);
 
   return completed;
 }
 
-function sortWorkouts(workouts: FullAttachedWorkout<'log'>[]): FullAttachedWorkout<'log'>[] {
-  return workouts
-  .sort((a, b) => {
+function sortWorkouts(
+  workouts: FullAttachedWorkout<"log">[],
+): FullAttachedWorkout<"log">[] {
+  return workouts.sort((a, b) => {
     const d = b.workout.completed_on.localeCompare(a.workout.completed_on);
     return d !== 0 ? d : a.workout.name.localeCompare(b.workout.name);
   });
@@ -466,7 +523,9 @@ function sortWorkouts(workouts: FullAttachedWorkout<'log'>[]): FullAttachedWorko
  * It is expected to always be able to fetch it.
  * In the case it does not, the return length WILL be less than the input length.
  */
-async function _fetchLogs(workouts: WorkoutLogRow[]): Promise<FullAttachedWorkout<'log'>[]> {
+async function _fetchLogs(
+  workouts: WorkoutLogRow[],
+): Promise<FullAttachedWorkout<"log">[]> {
   const ids = workouts.map((w) => w.id);
   const fullWorkouts = await fullAttachedWorkoutLogFromWorkoutLogIds(ids);
   const unfetched: UUID[] = [];
@@ -476,9 +535,12 @@ async function _fetchLogs(workouts: WorkoutLogRow[]): Promise<FullAttachedWorkou
     }
   });
   if (unfetched.length > 0) {
-    console.error(`Failed to fetch ${unfetched.length} workouts`, JSON.stringify(unfetched));
+    console.error(
+      `Failed to fetch ${unfetched.length} workouts`,
+      JSON.stringify(unfetched),
+    );
   }
-  return [...fullWorkouts.values()]
+  return [...fullWorkouts.values()];
 }
 
 // Maybe-TODO: If this ever becomes a hotspot with lots of headers (e.g. many years of logs),

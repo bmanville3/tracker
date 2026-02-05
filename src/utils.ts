@@ -218,8 +218,8 @@ export function fromISODate(d: ISODate): Date {
 /**
  * Gets the number of days from date1 to date2.
  * For example, if date1='2025-10-20' and date2='2025-10-21',
- * then daysBetweenDates(date1, date2) = 1. 
- * 
+ * then daysBetweenDates(date1, date2) = 1.
+ *
  * It is assumed date1 <= date2. A negative number CAN be returned.
  */
 export function daysBetweenDates(date1: ISODate, date2: ISODate): number {
@@ -240,7 +240,10 @@ export function addDaysToIsoDate(date: ISODate, days: number): ISODate {
   return toISODate(addDays(fromISODate(date), days));
 }
 
-export function generateDateRange(minDateInclusive: ISODate, maxDateInclusive: ISODate): ISODate[] {
+export function generateDateRange(
+  minDateInclusive: ISODate,
+  maxDateInclusive: ISODate,
+): ISODate[] {
   const range = [];
   let currDate = minDateInclusive;
   while (currDate <= maxDateInclusive) {
@@ -306,31 +309,47 @@ export function stringifyList(items: string[]): string {
 /**
  * https://stackoverflow.com/questions/51203917/math-behind-hsv-to-rgb-conversion-of-colors
  */
-function hsvToRgb(h: number, s: number, v: number): {r: number, b: number, g: number} {
-    let r: number = 0;
-    let b: number = 0;
-    let g: number = 0;
+function hsvToRgb(
+  h: number,
+  s: number,
+  v: number,
+): { r: number; b: number; g: number } {
+  let r: number = 0;
+  let b: number = 0;
+  let g: number = 0;
 
-    const i = Math.floor(h * 6);
-    const f = h * 6 - i;
-    const p = v * (1 - s);
-    const q = v * (1 - f * s);
-    const t = v * (1 - (1 - f) * s);
+  const i = Math.floor(h * 6);
+  const f = h * 6 - i;
+  const p = v * (1 - s);
+  const q = v * (1 - f * s);
+  const t = v * (1 - (1 - f) * s);
 
-    switch(i % 6){
-        case 0: r = v, g = t, b = p; break;
-        case 1: r = q, g = v, b = p; break;
-        case 2: r = p, g = v, b = t; break;
-        case 3: r = p, g = q, b = v; break;
-        case 4: r = t, g = p, b = v; break;
-        case 5: r = v, g = p, b = q; break;
-    }
+  switch (i % 6) {
+    case 0:
+      ((r = v), (g = t), (b = p));
+      break;
+    case 1:
+      ((r = q), (g = v), (b = p));
+      break;
+    case 2:
+      ((r = p), (g = v), (b = t));
+      break;
+    case 3:
+      ((r = p), (g = q), (b = v));
+      break;
+    case 4:
+      ((r = t), (g = p), (b = v));
+      break;
+    case 5:
+      ((r = v), (g = p), (b = q));
+      break;
+  }
 
-    return {
-      r: Math.round(r * 255),
-      g: Math.round(g * 255),
-      b: Math.round(b * 255),
-    };
+  return {
+    r: Math.round(r * 255),
+    g: Math.round(g * 255),
+    b: Math.round(b * 255),
+  };
 }
 
 export function rgbColorGenerator(step: number, maxSteps: number): string {
@@ -353,5 +372,9 @@ export function avg(nums: number[]): number | null {
 }
 
 export function isRealNumber(value: any): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+export function randomInt(min: number, max: number): number {
+  return Math.random() * (max - min) + min;
 }

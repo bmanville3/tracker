@@ -124,7 +124,11 @@ export function ExerciseModal(props: ExerciseModalProps) {
       [...(await searchExercises("Bench", null, limitToExercisesIds)).values()]
         .slice(0, 3)
         .forEach((er) => xs.push(er));
-      [...(await searchExercises("Deadlift", null, limitToExercisesIds)).values()]
+      [
+        ...(
+          await searchExercises("Deadlift", null, limitToExercisesIds)
+        ).values(),
+      ]
         .slice(0, 3)
         .forEach((er) => xs.push(er));
       xs = [...new Map(xs.map((er) => [er.id, er])).values()];

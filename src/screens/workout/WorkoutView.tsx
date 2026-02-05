@@ -22,7 +22,7 @@ import {
   updateExercisesForWorkoutWhere,
   updateWorkoutInWorkout,
   WorkoutEditorMode,
-  workoutHasProgram
+  workoutHasProgram,
 } from "@/src/api/workoutSharedApi";
 import { upsertTemplateWorkout } from "@/src/api/workoutTemplateApi";
 import {
@@ -37,11 +37,7 @@ import { rpeChartE1RM } from "@/src/screens/RPEChart";
 import { CACHE_FACTORY } from "@/src/swrCache";
 import { colors, spacing, typography } from "@/src/theme";
 import { DistanceUnit, ExerciseRow, UUID, WeightUnit } from "@/src/types";
-import {
-  anyErrorToString,
-  changeWeightUnit,
-  showAlert
-} from "@/src/utils";
+import { anyErrorToString, changeWeightUnit, showAlert } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
@@ -49,10 +45,12 @@ import { ExerciseModal } from "../exercise/ExerciseModal";
 import { VolumeRender } from "../exercise/VolumeRender";
 
 export type SharedProps<M extends WorkoutEditorMode> = {
-  setFullWorkout: React.Dispatch<React.SetStateAction<FullDetachedWorkoutForMode<M>>>;
+  setFullWorkout: React.Dispatch<
+    React.SetStateAction<FullDetachedWorkoutForMode<M>>
+  >;
   isLoading: boolean;
   allowEditing: boolean;
-}
+};
 
 export type SetRenderProps<M extends WorkoutEditorMode> = SharedProps<M> & {
   set: EditableSet<M>;
@@ -66,18 +64,21 @@ export type AdvancedSetRenderProps<M extends WorkoutEditorMode> =
     totalSetsInExercise: number;
     isVisible: boolean;
     onRequestClose: () => void;
-    setAdvancedSet: React.Dispatch<React.SetStateAction<[number, number] | null>>;
+    setAdvancedSet: React.Dispatch<
+      React.SetStateAction<[number, number] | null>
+    >;
   };
 
-export type HeaderSubFieldsProps<M extends WorkoutEditorMode> = SharedProps<M> & {
-  workout: EditableWorkout<M>;
-  openDatePicker: boolean;
-  setOpenDatePicker: (o: boolean) => void;
-  newSetWeightUnit: WeightUnit;
-  setNewSetWeightUnit: (w: WeightUnit) => void;
-  newSetDistanceUnit: DistanceUnit;
-  setNewSetDistanceUnit: (d: DistanceUnit) => void;
-};
+export type HeaderSubFieldsProps<M extends WorkoutEditorMode> =
+  SharedProps<M> & {
+    workout: EditableWorkout<M>;
+    openDatePicker: boolean;
+    setOpenDatePicker: (o: boolean) => void;
+    newSetWeightUnit: WeightUnit;
+    setNewSetWeightUnit: (w: WeightUnit) => void;
+    newSetDistanceUnit: DistanceUnit;
+    setNewSetDistanceUnit: (d: DistanceUnit) => void;
+  };
 
 export interface WorkoutEditorModeStrategy<M extends WorkoutEditorMode> {
   mode: M;
@@ -100,7 +101,9 @@ export interface WorkoutEditorModeStrategy<M extends WorkoutEditorMode> {
   ): React.JSX.Element | null;
 }
 
-function blankState<M extends WorkoutEditorMode>(strategy: WorkoutEditorModeStrategy<M>): FullDetachedWorkoutForMode<M> {
+function blankState<M extends WorkoutEditorMode>(
+  strategy: WorkoutEditorModeStrategy<M>,
+): FullDetachedWorkoutForMode<M> {
   return {
     workout: strategy.createEmptyWorkout(),
     exercises: [],
@@ -139,7 +142,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const [fullWorkout, setFullWorkout] = useState<FullDetachedWorkoutForMode<M>>(structuredClone(loadWithExisting) ?? blankState(strategy));
+  const [fullWorkout, setFullWorkout] = useState<FullDetachedWorkoutForMode<M>>(
+    structuredClone(loadWithExisting) ?? blankState(strategy),
+  );
 
   const [newSetWeightUnit, setNewSetWeightUnit] = useState<WeightUnit>("kg");
   const [newSetDistanceUnit, setNewSetDistanceUnit] =
@@ -158,32 +163,61 @@ export function WorkoutView<M extends WorkoutEditorMode>(
   const [editVolume, setEditVolumes] = useState<boolean>(false);
   const [advancedSet, setAdvancedSet] = useState<[number, number] | null>(null);
 
-  const initialFullWorkoutRef = useRef<FullDetachedWorkoutForMode<M>>(loadWithExisting && updateWorkoutId ? structuredClone(loadWithExisting) : blankState(strategy));
+  const initialFullWorkoutRef = useRef<FullDetachedWorkoutForMode<M>>(
+    loadWithExisting && updateWorkoutId
+      ? structuredClone(loadWithExisting)
+      : blankState(strategy),
+  );
 
   useEffect(() => {
     return CACHE_FACTORY.subscribe(async (e) => {
       const keyChange = e.key;
-      if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'write' && keyChange !== undefined) {
+      if (
+        e.cacheName === EXERCISE_CACHE_NAME &&
+        e.type === "write" &&
+        keyChange !== undefined
+      ) {
         const newExercise = (await fetchExercises()).get(keyChange);
         if (!newExercise) {
-          console.error(`Got write commit but ${keyChange} could not be found in new exercises`);
+          console.error(
+            `Got write commit but ${keyChange} could not be found in new exercises`,
+          );
           return;
         }
         // make typescript not complain
         // EditableExercise<M>["exercise"] === ExerciseRow for all M
-        const predicate = (editableExercise: EditableExercise<M>) => editableExercise.exercise.id === keyChange;
+        const predicate = (editableExercise: EditableExercise<M>) =>
+          editableExercise.exercise.id === keyChange;
         setFullWorkout((prev) => {
-          return updateExercisesForWorkoutWhere({fullWorkout: prev, predicate: predicate, key: 'exercise', value: newExercise});
+          return updateExercisesForWorkoutWhere({
+            fullWorkout: prev,
+            predicate: predicate,
+            key: "exercise",
+            value: newExercise,
+          });
         });
-        initialFullWorkoutRef.current
-          = updateExercisesForWorkoutWhere({fullWorkout: initialFullWorkoutRef.current, predicate: predicate, key: 'exercise', value: newExercise});
+        initialFullWorkoutRef.current = updateExercisesForWorkoutWhere({
+          fullWorkout: initialFullWorkoutRef.current,
+          predicate: predicate,
+          key: "exercise",
+          value: newExercise,
+        });
       }
-      if (e.cacheName === EXERCISE_CACHE_NAME && e.type === 'delete' && keyChange !== undefined) {
+      if (
+        e.cacheName === EXERCISE_CACHE_NAME &&
+        e.type === "delete" &&
+        keyChange !== undefined
+      ) {
         setFullWorkout((prev) => {
-          return removeExerciseFromWorkoutById({fullWorkout: prev, exerciseId: keyChange});
+          return removeExerciseFromWorkoutById({
+            fullWorkout: prev,
+            exerciseId: keyChange,
+          });
         });
-        initialFullWorkoutRef.current
-          = removeExerciseFromWorkoutById({fullWorkout: initialFullWorkoutRef.current, exerciseId: keyChange});
+        initialFullWorkoutRef.current = removeExerciseFromWorkoutById({
+          fullWorkout: initialFullWorkoutRef.current,
+          exerciseId: keyChange,
+        });
       }
     });
   }, [fullWorkout, initialFullWorkoutRef.current]);
@@ -195,11 +229,20 @@ export function WorkoutView<M extends WorkoutEditorMode>(
   };
 
   const isDirty = useMemo(() => {
-    if (updateWorkoutId === null && fullDetachedWorkoutEqual(initialFullWorkoutRef.current, blankState(strategy))) {
+    if (
+      updateWorkoutId === null &&
+      fullDetachedWorkoutEqual(
+        initialFullWorkoutRef.current,
+        blankState(strategy),
+      )
+    ) {
       // allow saving blank new logs
       return true;
     }
-    return !fullDetachedWorkoutEqual(initialFullWorkoutRef.current, fullWorkout);
+    return !fullDetachedWorkoutEqual(
+      initialFullWorkoutRef.current,
+      fullWorkout,
+    );
   }, [fullWorkout, initialFullWorkoutRef.current]);
 
   const renderAssociatedProgram = () => {
@@ -233,8 +276,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           value={workout.name}
           onChangeText={(text) => {
             setFullWorkout((prev) => {
-              return updateWorkoutInWorkout({fullWorkout: prev, key: 'name', value: text})
-            })
+              return updateWorkoutInWorkout({
+                fullWorkout: prev,
+                key: "name",
+                value: text,
+              });
+            });
           }}
           placeholder="Untitled workout"
           placeholderTextColor={colors.placeholderTextColor}
@@ -285,8 +332,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           value={workout.notes ?? ""}
           onChangeText={(text) => {
             setFullWorkout((prev) => {
-              return updateWorkoutInWorkout({fullWorkout: prev, key: 'notes', value: text})
-            })
+              return updateWorkoutInWorkout({
+                fullWorkout: prev,
+                key: "notes",
+                value: text,
+              });
+            });
           }}
           placeholder="Any notes about this workout (RPE goals, cues, etc.)"
           placeholderTextColor={colors.placeholderTextColor}
@@ -503,8 +554,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 onPress={() => {
                   setAdvancedExercise(exerciseIdx - 1);
                   setFullWorkout((prev) => {
-                    return swapExercisesInWorkout({fullWorkout: prev, exerciseIndexFirst: exerciseIdx - 1, exerciseIndexSecond: exerciseIdx})
-                  })
+                    return swapExercisesInWorkout({
+                      fullWorkout: prev,
+                      exerciseIndexFirst: exerciseIdx - 1,
+                      exerciseIndexSecond: exerciseIdx,
+                    });
+                  });
                 }}
                 variant="secondary"
                 style={{ padding: 4 }}
@@ -518,8 +573,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                 onPress={() => {
                   setAdvancedExercise(exerciseIdx + 1);
                   setFullWorkout((prev) => {
-                    return swapExercisesInWorkout({fullWorkout: prev, exerciseIndexFirst: exerciseIdx + 1, exerciseIndexSecond: exerciseIdx})
-                  })
+                    return swapExercisesInWorkout({
+                      fullWorkout: prev,
+                      exerciseIndexFirst: exerciseIdx + 1,
+                      exerciseIndexSecond: exerciseIdx,
+                    });
+                  });
                 }}
                 variant="secondary"
                 style={{ padding: 4 }}
@@ -535,8 +594,13 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             onPress={() => {
               setExercisePickerFunction(() => (newExercise: ExerciseRow) => {
                 setFullWorkout((prev) => {
-                  return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'exercise', value: newExercise});
-                })
+                  return updateExerciseForWorkout({
+                    fullWorkout: prev,
+                    exerciseIndex: exerciseIdx,
+                    key: "exercise",
+                    value: newExercise,
+                  });
+                });
                 clearAdvancedExercise();
               });
               setOpenExercisePicker(true);
@@ -552,7 +616,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             value={exercise.notes ?? ""}
             onChangeText={(text) =>
               setFullWorkout((prev) => {
-                return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'notes', value: text});
+                return updateExerciseForWorkout({
+                  fullWorkout: prev,
+                  exerciseIndex: exerciseIdx,
+                  key: "notes",
+                  value: text,
+                });
               })
             }
             placeholder="Any notes about this exercise (RPE goals, cues, etc.)"
@@ -655,8 +724,11 @@ export function WorkoutView<M extends WorkoutEditorMode>(
             onPress={() => {
               clearAdvancedExercise();
               setFullWorkout((prev) => {
-                return removeExerciseFromWorkoutByIndex({fullWorkout: prev, exerciseIndex: exerciseIdx})
-              })
+                return removeExerciseFromWorkoutByIndex({
+                  fullWorkout: prev,
+                  exerciseIndex: exerciseIdx,
+                });
+              });
             }}
             variant="revert"
             disabled={!allowEditing || isLoading}
@@ -693,7 +765,10 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                         notes: "",
                       };
                       setFullWorkout((prev) => {
-                        return addExerciseToWorkout({fullWorkout: prev, newExercise})
+                        return addExerciseToWorkout({
+                          fullWorkout: prev,
+                          newExercise,
+                        });
                       });
                     },
                   );
@@ -766,19 +841,43 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                     onPress={() => {
                       setFullWorkout((prev) => {
                         if (ex.superset_group !== null) {
-                          return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: null});
+                          return updateExerciseForWorkout({
+                            fullWorkout: prev,
+                            exerciseIndex: exerciseIdx,
+                            key: "superset_group",
+                            value: null,
+                          });
                         }
                         for (let i = exerciseIdx - 1; i >= 0; i--) {
                           const exerciseBefore = fullWorkout.exercises[i];
                           if (exerciseBefore.superset_group === null) continue;
-                          return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: exerciseBefore.superset_group});
+                          return updateExerciseForWorkout({
+                            fullWorkout: prev,
+                            exerciseIndex: exerciseIdx,
+                            key: "superset_group",
+                            value: exerciseBefore.superset_group,
+                          });
                         }
-                        for (let i = exerciseIdx + 1; i < fullWorkout.exercises.length; i++) {
+                        for (
+                          let i = exerciseIdx + 1;
+                          i < fullWorkout.exercises.length;
+                          i++
+                        ) {
                           const exerciseAfter = fullWorkout.exercises[i];
                           if (exerciseAfter.superset_group === null) continue;
-                          return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: exerciseAfter.superset_group});
+                          return updateExerciseForWorkout({
+                            fullWorkout: prev,
+                            exerciseIndex: exerciseIdx,
+                            key: "superset_group",
+                            value: exerciseAfter.superset_group,
+                          });
                         }
-                        return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value: 1});
+                        return updateExerciseForWorkout({
+                          fullWorkout: prev,
+                          exerciseIndex: exerciseIdx,
+                          key: "superset_group",
+                          value: 1,
+                        });
                       });
                     }}
                     disabled={isLoading || !allowEditing}
@@ -789,7 +888,12 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                       onChangeNumber={(value) => {
                         if (value !== null && value >= 1) {
                           setFullWorkout((prev) => {
-                            return updateExerciseForWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, key: 'superset_group', value})
+                            return updateExerciseForWorkout({
+                              fullWorkout: prev,
+                              exerciseIndex: exerciseIdx,
+                              key: "superset_group",
+                              value,
+                            });
                           });
                         }
                       }}
@@ -810,11 +914,16 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                       title={"Add Set"}
                       onPress={() => {
                         setFullWorkout((prev) => {
-                          const setsForExerciseInWorkout = fullWorkout.sets[exerciseIdx];
+                          const setsForExerciseInWorkout =
+                            fullWorkout.sets[exerciseIdx];
                           if (setsForExerciseInWorkout.length > 0) {
                             const lastSetSeen = setsForExerciseInWorkout.at(-1);
                             if (lastSetSeen) {
-                              return addSetToWorkout({fullWorkout: prev, exerciseIndex: exerciseIdx, newSet: {...lastSetSeen}});
+                              return addSetToWorkout({
+                                fullWorkout: prev,
+                                exerciseIndex: exerciseIdx,
+                                newSet: { ...lastSetSeen },
+                              });
                             }
                           }
                           return addSetToWorkout({
@@ -823,9 +932,9 @@ export function WorkoutView<M extends WorkoutEditorMode>(
                             newSet: strategy.createEmptySet({
                               weightUnit: newSetWeightUnit,
                               distanceUnit: newSetDistanceUnit,
-                            })
-                          })
-                        })
+                            }),
+                          });
+                        });
                       }}
                       style={{ marginLeft: "auto", padding: 4 }}
                       textProps={{
@@ -864,8 +973,11 @@ export function WorkoutView<M extends WorkoutEditorMode>(
       fullWorkout.workout.name.length === 0
         ? { ...fullWorkout.workout, name: "Untitled Workout" }
         : fullWorkout.workout;
-    
-    const payload: FullDetachedWorkoutForMode<M> = {...fullWorkout, workout: finalWorkout};
+
+    const payload: FullDetachedWorkoutForMode<M> = {
+      ...fullWorkout,
+      workout: finalWorkout,
+    };
 
     setFullWorkout(payload);
 
@@ -886,7 +998,10 @@ export function WorkoutView<M extends WorkoutEditorMode>(
           if (newId === null) {
             throw new Error("Had successful upsert but new id was null");
           }
-          onSuccessfulSave({...payload, workoutId: newId} satisfies FullAttachedWorkout<M>);
+          onSuccessfulSave({
+            ...payload,
+            workoutId: newId,
+          } satisfies FullAttachedWorkout<M>);
         }
       } else {
         throw new Error(

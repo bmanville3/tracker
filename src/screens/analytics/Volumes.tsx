@@ -1,6 +1,14 @@
-import { EXERCISE_MUSCLE_CACHE_NAME, fetchExerciseMuscleVolumes } from "@/src/api/exerciseApi";
+import {
+  EXERCISE_MUSCLE_CACHE_NAME,
+  fetchExerciseMuscleVolumes,
+} from "@/src/api/exerciseApi";
 import { fetchMuscleGroups } from "@/src/api/muscleApi";
-import { FullAttachedWorkout, isFullAttachedLogWorkouts, isFullAttachedTemplateWorkouts, WorkoutEditorMode } from "@/src/api/workoutSharedApi";
+import {
+  FullAttachedWorkout,
+  isFullAttachedLogWorkouts,
+  isFullAttachedTemplateWorkouts,
+  WorkoutEditorMode,
+} from "@/src/api/workoutSharedApi";
 import {
   Button,
   ClosableModal,
@@ -8,6 +16,7 @@ import {
   Selection,
 } from "@/src/components";
 import { ALLOWED_VOLUMES } from "@/src/screens/exercise/VolumeRender";
+import { CACHE_FACTORY } from "@/src/swrCache";
 import { colors, spacing, typography } from "@/src/theme";
 import {
   ExerciseMuscleRow,
@@ -16,33 +25,34 @@ import {
   MuscleGroupRow,
   RPE,
   RPES,
-  UUID
+  UUID,
 } from "@/src/types";
 import { daysBetweenDates, isRealNumber, requireGetUser } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { BarChart, barDataItem } from "react-native-gifted-charts";
-import { Contribution, emptyContributionRecord, emptyMGRecord, extractVolumes } from "./helpers";
-import { CACHE_FACTORY } from "@/src/swrCache";
+import {
+  Contribution,
+  emptyContributionRecord,
+  emptyMGRecord,
+  extractVolumes,
+} from "./helpers";
 
 type VolumesProps<M extends WorkoutEditorMode> = {
   /** Workouts to model volume. */
   workoutsForMuscleVolume: FullAttachedWorkout<M>[];
   daysSpan?: number | null;
-}
+};
 
 function daysToLabel(number: 1 | 7 | 30 | 365) {
-  return number === 1 ? "Daily" :
-    number === 7 ? "Weekly" :
-    number === 30 ? "Monthly" :
-    "Yearly"
+  return number === 1
+    ? "Daily"
+    : number === 7
+      ? "Weekly"
+      : number === 30
+        ? "Monthly"
+        : "Yearly";
 }
 
 export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
@@ -73,12 +83,14 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
   // advanced settings for volume
   const [showAdvancedVolumeSettings, setShowAdvancedVolumeSettings] =
     useState<boolean>(false);
-  const [showAsNDayAverage, setShowAsNDayAverage] = useState<1 | 7 | 30 | 365 | null>(
-    null,
-  );
+  const [showAsNDayAverage, setShowAsNDayAverage] = useState<
+    1 | 7 | 30 | 365 | null
+  >(null);
   const [filterWarmups, setFilterWarmups] = useState<boolean>(true);
   const [mustBeGeEqThresh, setMustBeGeEqThresh] = useState<number | null>(null);
-  const [rpeMustMeetCriteria, setRPEMustMeetCriteria] = useState<RPE | null | 'no-track'>(6);
+  const [rpeMustMeetCriteria, setRPEMustMeetCriteria] = useState<
+    RPE | null | "no-track"
+  >(6);
   const [disableFractionalVolume, setDisableFractionalVolume] =
     useState<boolean>(false);
 
@@ -86,7 +98,10 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
     if (daysSpan !== undefined && daysSpan !== null) {
       return daysSpan;
     }
-    if (workoutsForMuscleVolume.length === 0 || workoutsForMuscleVolume.length === 1) {
+    if (
+      workoutsForMuscleVolume.length === 0 ||
+      workoutsForMuscleVolume.length === 1
+    ) {
       return workoutsForMuscleVolume.length;
     }
     if (isFullAttachedLogWorkouts(workoutsForMuscleVolume)) {
@@ -107,8 +122,11 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
       workoutsForMuscleVolume.forEach((w) => {
         const block = w.workout.block_in_program;
         const week = w.workout.week_in_block;
-        blockToWeeks.set(block, (blockToWeeks.get(block) ?? new Set()).add(week));
-      })
+        blockToWeeks.set(
+          block,
+          (blockToWeeks.get(block) ?? new Set()).add(week),
+        );
+      });
       let numWeeks = 0;
       blockToWeeks.values().forEach((s) => {
         let lastWeek = -1;
@@ -117,10 +135,12 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
         }
         // last week is 0 indexed
         numWeeks += lastWeek + 1;
-      })
+      });
       return numWeeks * 7;
     } else {
-      throw new Error(`Cannot process workouts due to type: ${JSON.stringify(workoutsForMuscleVolume)}`);
+      throw new Error(
+        `Cannot process workouts due to type: ${JSON.stringify(workoutsForMuscleVolume)}`,
+      );
     }
   }, [workoutsForMuscleVolume, daysSpan]);
 
@@ -250,7 +270,9 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
             <ModalPicker
               title="Show as Trend"
               help="Scales your recent average volume to show trends over different time periods (e.g., weekly trend from the last 30 days, daily trend from the last 7 days). Formula used is: (total volume ÷ days in range) × trend period."
-              options={([null, 'Daily', 'Weekly', 'Monthly', 'Yearly'] as const).map((n) => {
+              options={(
+                [null, "Daily", "Weekly", "Monthly", "Yearly"] as const
+              ).map((n) => {
                 return {
                   label: n === null ? "None" : n,
                   value: n,
@@ -259,17 +281,21 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
               onChange={(value) => {
                 if (value === null) {
                   setShowAsNDayAverage(value);
-                } else if (value === 'Daily') {
+                } else if (value === "Daily") {
                   setShowAsNDayAverage(1);
-                } else if (value === 'Weekly') {
+                } else if (value === "Weekly") {
                   setShowAsNDayAverage(7);
-                } else if (value === 'Monthly') {
+                } else if (value === "Monthly") {
                   setShowAsNDayAverage(30);
-                } else if (value === 'Yearly') {
+                } else if (value === "Yearly") {
                   setShowAsNDayAverage(365);
                 }
               }}
-              value={showAsNDayAverage === null ? null : daysToLabel(showAsNDayAverage)}
+              value={
+                showAsNDayAverage === null
+                  ? null
+                  : daysToLabel(showAsNDayAverage)
+              }
               pressableProps={{
                 style: { alignSelf: "flex-start", padding: spacing.padding_sm },
               }}
@@ -327,15 +353,23 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
             <ModalPicker
               title="Set RPE Filter"
               help="A set must achieve at least this RPE to be tracked. If RPE is missing and there is an applied filter, the set is ignored."
-              options={[...RPES, null, 'no-track'].map((v) => {
-                return { label: v === null ? "No Filter" : v === 'no-track' ? 'Remove sets without an RPE' : `\u2265${v}`, value: v };
+              options={[...RPES, null, "no-track"].map((v) => {
+                return {
+                  label:
+                    v === null
+                      ? "No Filter"
+                      : v === "no-track"
+                        ? "Remove sets without an RPE"
+                        : `\u2265${v}`,
+                  value: v,
+                };
               })}
               value={rpeMustMeetCriteria}
               onChange={(value) => {
                 if (value === null) {
                   setRPEMustMeetCriteria(null);
-                } else if (value === 'no-track') {
-                  setRPEMustMeetCriteria('no-track');
+                } else if (value === "no-track") {
+                  setRPEMustMeetCriteria("no-track");
                 } else if (isRealNumber(value) && RPES.includes(value)) {
                   setRPEMustMeetCriteria(value);
                 } else {
@@ -401,34 +435,31 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
             <Text style={typography.hint}>Loading muscle volumes…</Text>
           </View>
         ) : (
-          <ScrollView horizontal>
-            <BarChart
-              data={barData}
-              disableScroll={true} // i like look better with my own scroll
-              barWidth={34}
-              spacing={40}
-              height={220}
-              frontColor={colors.primary}
-              maxValue={maxBarValue}
-              hideYAxisText={true}
-              yAxisThickness={0}
-              initialSpacing={20}
-              endSpacing={10}
-              xAxisLabelTextStyle={{
-                ...typography.hint,
-                color: colors.textPrimary,
-                fontWeight: "600",
-                backgroundColor: colors.primarySoft,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: colors.border,
-                marginRight: 1,
-              }}
-              rulesColor={colors.border}
-              topLabelTextStyle={typography.hint}
-              showValuesAsTopLabel
-            />
-          </ScrollView>
+          <BarChart
+            data={barData}
+            barWidth={34}
+            spacing={40}
+            height={220}
+            frontColor={colors.primary}
+            maxValue={maxBarValue}
+            hideYAxisText={true}
+            yAxisThickness={0}
+            initialSpacing={20}
+            endSpacing={10}
+            xAxisLabelTextStyle={{
+              ...typography.hint,
+              color: colors.textPrimary,
+              fontWeight: "600",
+              backgroundColor: colors.primarySoft,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: colors.border,
+              marginRight: 1,
+            }}
+            rulesColor={colors.border}
+            topLabelTextStyle={typography.hint}
+            showValuesAsTopLabel
+          />
         )}
       </View>
 
@@ -507,9 +538,14 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
                     <Text
                       style={{ ...styles.highlightedText, fontWeight: "700" }}
                     >
-                      {(conFac / numDaysSpanned * showAsNDayAverage).toFixed(2)} Set
-                      {conFac / numDaysSpanned * showAsNDayAverage === 1 ? "" : "s"} /{" "}
-                      {daysToLabel(showAsNDayAverage)}
+                      {((conFac / numDaysSpanned) * showAsNDayAverage).toFixed(
+                        2,
+                      )}{" "}
+                      Set
+                      {(conFac / numDaysSpanned) * showAsNDayAverage === 1
+                        ? ""
+                        : "s"}{" "}
+                      / {daysToLabel(showAsNDayAverage)}
                     </Text>
                   </View>
                 )}

@@ -12,7 +12,10 @@ import {
   fetchLastNWorkoutLogs,
   FULL_WORKOUT_LOG_CACHE_NAME,
 } from "@/src/api/workoutLogApi";
-import { FullAttachedWorkout, FullDetachedWorkoutForMode } from "@/src/api/workoutSharedApi";
+import {
+  FullAttachedWorkout,
+  FullDetachedWorkoutForMode,
+} from "@/src/api/workoutSharedApi";
 import { Button, ClosableModal, Screen } from "@/src/components";
 import { ErrorBanner } from "@/src/components/ErrorBanner";
 import { logWorkoutStrategy } from "@/src/screens/workout/LogWorkoutEditorStrategy";
@@ -32,13 +35,13 @@ export default function WorkoutLogIndex() {
   const [updateId, setUpdateId] = useState<UUID | null>(null);
   const [allowEdit, setAllowEdit] = useState<boolean>(false);
   const [confirmDelete, setConfirmDelete] =
-    useState<FullAttachedWorkout<'log'> | null>(null);
+    useState<FullAttachedWorkout<"log"> | null>(null);
   const [confirmDelete2, setConfirmDelete2] = useState<boolean>(false);
   const [confirmCopy, setConfirmCopy] =
-    useState<FullAttachedWorkout<'log'> | null>(null);
+    useState<FullAttachedWorkout<"log"> | null>(null);
 
   const [displayedWorkouts, setDisplayedWorkouts] = useState<
-    FullAttachedWorkout<'log'>[]
+    FullAttachedWorkout<"log">[]
   >([]);
 
   const [loading, setLoading] = useState(false);
@@ -64,9 +67,9 @@ export default function WorkoutLogIndex() {
   useEffect(() => {
     return CACHE_FACTORY.subscribe((e) => {
       if (e.cacheName === FULL_WORKOUT_LOG_CACHE_NAME) {
-        reloadWorkouts();  
+        reloadWorkouts();
       }
-    })
+    });
   }, [reloadWorkouts]);
 
   const previewByWorkoutId: Record<UUID, string> = useMemo(() => {
@@ -102,17 +105,21 @@ export default function WorkoutLogIndex() {
     setWorkoutViewIsActive(true);
   }
 
-  function openCopyWorkout(fullWorkout: FullAttachedWorkout<'log'>) {
+  function openCopyWorkout(fullWorkout: FullAttachedWorkout<"log">) {
     setConfirmCopy(null);
     const { workoutId: _id, workout, exercises, sets } = fullWorkout;
-    const newFromWorkout: FullDetachedWorkoutForMode<"log"> = {exercises, sets, workout: {...workout, name: workout.name + ' (copy)'}};
+    const newFromWorkout: FullDetachedWorkoutForMode<"log"> = {
+      exercises,
+      sets,
+      workout: { ...workout, name: workout.name + " (copy)" },
+    };
     setFromWorkout(newFromWorkout);
     setUpdateId(null);
     setAllowEdit(true);
     setWorkoutViewIsActive(true);
   }
 
-  function openEditWorkout(fullWorkout: FullAttachedWorkout<'log'>) {
+  function openEditWorkout(fullWorkout: FullAttachedWorkout<"log">) {
     setAllowEdit(true);
     setWorkoutViewIsActive(true);
     const { workoutId, ...rest } = fullWorkout;
@@ -120,7 +127,7 @@ export default function WorkoutLogIndex() {
     setUpdateId(workoutId satisfies UUID);
   }
 
-  function openViewWorkout(fullWorkout: FullAttachedWorkout<'log'>) {
+  function openViewWorkout(fullWorkout: FullAttachedWorkout<"log">) {
     setAllowEdit(false);
     setWorkoutViewIsActive(true);
     const { workoutId, ...rest } = fullWorkout;
@@ -165,7 +172,10 @@ export default function WorkoutLogIndex() {
           variant="primary"
           style={{ marginLeft: "auto", borderRadius: 999, padding: 10 }}
           textProps={{
-            style: { fontSize: typography.hint.fontSize, color: colors.textOnPrimary },
+            style: {
+              fontSize: typography.hint.fontSize,
+              color: colors.textOnPrimary,
+            },
           }}
         />
       </View>
@@ -208,20 +218,37 @@ export default function WorkoutLogIndex() {
 
                   <View style={styles.iconRow}>
                     {/* Edit icon */}
-                    <Feather name="edit-2" size={22} hitSlop={8} onPress={(e) => {
-                      e.stopPropagation();
-                      openEditWorkout(fw);
-                    }}/>
+                    <Feather
+                      name="edit-2"
+                      size={22}
+                      hitSlop={8}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        openEditWorkout(fw);
+                      }}
+                    />
                     {/* Copy icon */}
-                    <Feather name="copy" size={22} hitSlop={8}  style={{ marginLeft: 8 }} onPress={(e) => {
-                      e.stopPropagation();
-                      setConfirmCopy(fw);
-                    }}/>
+                    <Feather
+                      name="copy"
+                      size={22}
+                      hitSlop={8}
+                      style={{ marginLeft: 8 }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setConfirmCopy(fw);
+                      }}
+                    />
                     {/* Delete icon */}
-                    <Feather name="trash-2" size={22} hitSlop={8}  style={{ marginLeft: 8 }} onPress={(e) => {
-                      e.stopPropagation();
-                      setConfirmDelete(fw);
-                    }}/>
+                    <Feather
+                      name="trash-2"
+                      size={22}
+                      hitSlop={8}
+                      style={{ marginLeft: 8 }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setConfirmDelete(fw);
+                      }}
+                    />
                   </View>
                 </View>
                 <Text style={typography.hint}>
@@ -281,37 +308,54 @@ export default function WorkoutLogIndex() {
           disabled={loading}
         />
         <Button
-          title={!confirmDelete2 ? "Confirm Delete" : "Whoops! Glad I got another chance."}
+          title={
+            !confirmDelete2
+              ? "Confirm Delete"
+              : "Whoops! Glad I got another chance."
+          }
           variant={!confirmDelete2 ? "revert" : "secondary"}
           onPress={() => setConfirmDelete2((prev) => !prev)}
           disabled={loading}
-          style={confirmDelete2 ? { borderColor: colors.selection, backgroundColor: colors.selectionBg }: {}}
-          textProps={confirmDelete2 ? { style: { color: colors.selection } } : {}}
+          style={
+            confirmDelete2
+              ? {
+                  borderColor: colors.selection,
+                  backgroundColor: colors.selectionBg,
+                }
+              : {}
+          }
+          textProps={
+            confirmDelete2 ? { style: { color: colors.selection } } : {}
+          }
         />
-        {confirmDelete2 && <Button
-          title={"Confirm Delete (last chance)"}
-          variant="revert"
-          onPress={() => {
-            if (confirmDelete === null) {
+        {confirmDelete2 && (
+          <Button
+            title={"Confirm Delete (last chance)"}
+            variant="revert"
+            onPress={() => {
+              if (confirmDelete === null) {
+                setConfirmDelete2(false);
+                return;
+              }
+              setLoading(true);
               setConfirmDelete2(false);
-              return;
-            }
-            setLoading(true);
-            setConfirmDelete2(false);
-            deleteWorkoutLog(confirmDelete.workoutId)
-              .then(() => {
-                showAlert("Log successfully deleted");
-              })
-              .catch((e) =>
-                setErrorText(anyErrorToString(e, "Error deleting workout log")),
-              )
-              .finally(() => {
-                setConfirmDelete(null);
-                setLoading(false);
-              });
-          }}
-          disabled={loading || !confirmDelete2}
-        />}
+              deleteWorkoutLog(confirmDelete.workoutId)
+                .then(() => {
+                  showAlert("Log successfully deleted");
+                })
+                .catch((e) =>
+                  setErrorText(
+                    anyErrorToString(e, "Error deleting workout log"),
+                  ),
+                )
+                .finally(() => {
+                  setConfirmDelete(null);
+                  setLoading(false);
+                });
+            }}
+            disabled={loading || !confirmDelete2}
+          />
+        )}
       </ClosableModal>
       <ClosableModal
         visible={confirmCopy !== null}

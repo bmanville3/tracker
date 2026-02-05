@@ -26,34 +26,42 @@ export function Button(props: ButtonProps) {
   const isPrimary = variant === "primary";
   const isSecondary = variant === "secondary";
 
+  const variantStyle = isPrimary
+    ? styles.primary
+    : isSecondary
+      ? styles.secondary
+      : styles.revert;
+
+  const variantTextStyle = isPrimary
+    ? styles.textPrimary
+    : isSecondary
+      ? styles.textSecondary
+      : styles.textPrimary;
+
   return (
     <Pressable
-      style={[
+      {...rest}
+      style={({ pressed }) => [
         styles.base,
-        isPrimary
-          ? styles.primary
-          : isSecondary
-            ? styles.secondary
-            : styles.revert,
+        variantStyle,
         rest.disabled && styles.disabled,
+        pressed && !rest.disabled && styles.pressed,
         style,
       ]}
-      {...rest}
     >
-      <Text
-        style={[
-          styles.textBase,
-          isPrimary
-            ? styles.textPrimary
-            : isSecondary
-              ? styles.textSecondary
-              : styles.textPrimary,
-          textStyle,
-        ]}
-        {...textRest}
-      >
-        {title}
-      </Text>
+      {({ pressed }) => (
+        <Text
+          style={[
+            styles.textBase,
+            variantTextStyle,
+            pressed && !rest.disabled && styles.textPressed,
+            textStyle,
+          ]}
+          {...textRest}
+        >
+          {title}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -65,9 +73,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     margin: 2,
   },
-  primary: {
-    backgroundColor: colors.primary,
-  },
+  primary: { backgroundColor: colors.primary },
   secondary: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -78,17 +84,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderWidth: 1,
   },
-  textBase: {
-    fontSize: 16,
-    fontWeight: "700",
+
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
-  textPrimary: {
-    color: colors.textOnPrimary,
+  textPressed: {
+    opacity: 0.95,
   },
-  textSecondary: {
-    color: colors.textPrimary,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
+
+  textBase: { fontSize: 16, fontWeight: "700" },
+  textPrimary: { color: colors.textOnPrimary },
+  textSecondary: { color: colors.textPrimary },
+
+  disabled: { opacity: 0.6 },
 });

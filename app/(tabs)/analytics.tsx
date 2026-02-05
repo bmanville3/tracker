@@ -1,9 +1,10 @@
-import { fetchWorkoutLogsInRange, fetchWorkoutLogsOnOrAfterDate, FULL_WORKOUT_LOG_CACHE_NAME } from "@/src/api/workoutLogApi";
-import { FullAttachedWorkout } from "@/src/api/workoutSharedApi";
 import {
-  ModalPicker,
-  Screen
-} from "@/src/components";
+  fetchWorkoutLogsInRange,
+  fetchWorkoutLogsOnOrAfterDate,
+  FULL_WORKOUT_LOG_CACHE_NAME,
+} from "@/src/api/workoutLogApi";
+import { FullAttachedWorkout } from "@/src/api/workoutSharedApi";
+import { ModalPicker, Screen } from "@/src/components";
 import { CalendarModal } from "@/src/components/CalendarModal";
 import { ExerciseTracker } from "@/src/screens/analytics/ExerciseTracker";
 import { Volumes } from "@/src/screens/analytics/Volumes";
@@ -37,7 +38,9 @@ export default function Analytics() {
   // Volume Handles
   ///////////
   const [muscleVolumeDays, setMuscleVolumeDays] = useState<number>(7);
-  const [workoutsForMuscleVolume, setWorkoutsForMuscleVolume] = useState<FullAttachedWorkout<'log'>[]>([]);
+  const [workoutsForMuscleVolume, setWorkoutsForMuscleVolume] = useState<
+    FullAttachedWorkout<"log">[]
+  >([]);
   const [isFetchingVolumes, setIsFetchingVolumes] = useState<boolean>(false);
   ///////////
   ///////////
@@ -45,14 +48,22 @@ export default function Analytics() {
   ///////////
   // Exercise Handles
   ///////////
-  const [isFetchingWorkoutsForExercise, setIsFetchingWorkoutsForExercise] = useState<boolean>(false);
-  const [workoutsForExercises, setWorkoutsForExercises] = useState<FullAttachedWorkout<'log'>[]>([]);
+  const [isFetchingWorkoutsForExercise, setIsFetchingWorkoutsForExercise] =
+    useState<boolean>(false);
+  const [workoutsForExercises, setWorkoutsForExercises] = useState<
+    FullAttachedWorkout<"log">[]
+  >([]);
   const [openDatePicker, setOpenDatePicker] = useState<boolean>(false);
-  const [datePickerSelectedDate, setDatePickerSelectedDate] = useState<ISODate | null>(null);
-  const [calendarTitle, setCalendarTitle] = useState<string>('');
-  const [datePickerFn, setDatePickerFn] = useState<((date: ISODate) => void) | null>(null);
+  const [datePickerSelectedDate, setDatePickerSelectedDate] =
+    useState<ISODate | null>(null);
+  const [calendarTitle, setCalendarTitle] = useState<string>("");
+  const [datePickerFn, setDatePickerFn] = useState<
+    ((date: ISODate) => void) | null
+  >(null);
 
-  const [startDate, setStartDate] = useState<ISODate>(getDaySpanIncludingToday(30));
+  const [startDate, setStartDate] = useState<ISODate>(
+    getDaySpanIncludingToday(30),
+  );
   const [endDate, setEndDate] = useState<ISODate>(getDaySpanIncludingToday(1));
 
   const initStart = useRef<ISODate | null>(null);
@@ -63,7 +74,9 @@ export default function Analytics() {
   const fetchWorkoutsForExercises = useCallback(async () => {
     setIsFetchingWorkoutsForExercise(true);
     try {
-      setWorkoutsForExercises(await fetchWorkoutLogsInRange(startDate, endDate));
+      setWorkoutsForExercises(
+        await fetchWorkoutLogsInRange(startDate, endDate),
+      );
       initStart.current = startDate;
       initEnd.current = endDate;
     } finally {
@@ -74,15 +87,21 @@ export default function Analytics() {
   const fetchMuscleVolumes = useCallback(async () => {
     setIsFetchingVolumes(true);
     try {
-      const workouts = await fetchWorkoutLogsOnOrAfterDate(getDaySpanIncludingToday(muscleVolumeDays));
+      const workouts = await fetchWorkoutLogsOnOrAfterDate(
+        getDaySpanIncludingToday(muscleVolumeDays),
+      );
       setWorkoutsForMuscleVolume(workouts);
     } finally {
       setIsFetchingVolumes(false);
     }
   }, [muscleVolumeDays]);
 
-  useEffect(() => { fetchMuscleVolumes(); }, [fetchMuscleVolumes]);
-  useEffect(() => { fetchWorkoutsForExercises(); }, [fetchWorkoutsForExercises]);
+  useEffect(() => {
+    fetchMuscleVolumes();
+  }, [fetchMuscleVolumes]);
+  useEffect(() => {
+    fetchWorkoutsForExercises();
+  }, [fetchWorkoutsForExercises]);
 
   useEffect(() => {
     return CACHE_FACTORY.subscribe((e) => {
@@ -140,15 +159,25 @@ export default function Analytics() {
       />
       {/** ////////////////// */}
 
-      <View style={{borderWidth: 1, borderColor: colors.border, margin: spacing.lg}}/>
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: colors.border,
+          margin: spacing.lg,
+        }}
+      />
 
       {/** Track exercises specifically */}
       <Text style={typography.subsection}>Exercise Tracker</Text>
-      <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+      <View
+        style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}
+      >
         <Text style={typography.body}>From</Text>
         <Pressable
           onPress={() => {
-            setCalendarTitle(`Pick start date. Must be before or on ${endDate}`)
+            setCalendarTitle(
+              `Pick start date. Must be before or on ${endDate}`,
+            );
             setDatePickerFn(() => (date: ISODate) => {
               if (date > endDate) {
                 showAlert(`Start date must be before or on ${endDate}`);
@@ -156,7 +185,7 @@ export default function Analytics() {
               }
               setStartDate(date);
               setDatePickerSelectedDate(date);
-            })
+            });
             setDatePickerSelectedDate(startDate);
             setOpenDatePicker(true);
           }}
@@ -167,7 +196,7 @@ export default function Analytics() {
         <Text style={typography.body}>To</Text>
         <Pressable
           onPress={() => {
-            setCalendarTitle(`Pick end date. Must be on or after ${startDate}`)
+            setCalendarTitle(`Pick end date. Must be on or after ${startDate}`);
             setDatePickerFn(() => (date: ISODate) => {
               if (date < startDate) {
                 showAlert(`End date must be on or after ${startDate}`);
@@ -175,7 +204,7 @@ export default function Analytics() {
               }
               setEndDate(date);
               setDatePickerSelectedDate(date);
-            })
+            });
             setDatePickerSelectedDate(endDate);
             setOpenDatePicker(true);
           }}
@@ -184,9 +213,11 @@ export default function Analytics() {
           <Text style={typography.hint}>{endDate}</Text>
         </Pressable>
       </View>
-      {isFetchingWorkoutsForExercise ? <ActivityIndicator/> : <ExerciseTracker
-        trackOverWorkouts={workoutsForExercises}
-      />}
+      {isFetchingWorkoutsForExercise ? (
+        <ActivityIndicator />
+      ) : (
+        <ExerciseTracker trackOverWorkouts={workoutsForExercises} />
+      )}
       <CalendarModal
         title={calendarTitle}
         visible={openDatePicker}

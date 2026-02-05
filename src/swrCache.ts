@@ -70,7 +70,11 @@ export class SwrKeyedCache<V> implements CacheHandle {
     return this.store.get(key)?.value ?? null;
   }
 
-  async fetch(key: string, fetcher: () => Promise<V>, beforeNotify?: () => void): Promise<V> {
+  async fetch(
+    key: string,
+    fetcher: () => Promise<V>,
+    beforeNotify?: () => void,
+  ): Promise<V> {
     const e = this.entry(key);
 
     if (e.value !== null) {
@@ -81,11 +85,17 @@ export class SwrKeyedCache<V> implements CacheHandle {
       }
       return e.value;
     }
-    console.debug(`'${key}' had complete cache miss in cache '${this.name}'. Fetching from database`);
+    console.debug(
+      `'${key}' had complete cache miss in cache '${this.name}'. Fetching from database`,
+    );
     return await this.refresh(key, fetcher, beforeNotify);
   }
 
-  async refresh(key: string, fetcher: () => Promise<V>, beforeNotify?: () => void): Promise<V> {
+  async refresh(
+    key: string,
+    fetcher: () => Promise<V>,
+    beforeNotify?: () => void,
+  ): Promise<V> {
     const e = this.entry(key);
     if (e.inFlight) return e.inFlight;
     console.debug(`Refreshing '${key}' in cache '${this.name}'`);
@@ -104,22 +114,22 @@ export class SwrKeyedCache<V> implements CacheHandle {
       }
 
       return { v, committed };
-    })().finally(() => {
-      e.inFlight = null;
-    })
-    .then(({ v, committed }) => {
-      if (committed) {
-        if (beforeNotify) {
-          beforeNotify();
+    })()
+      .finally(() => {
+        e.inFlight = null;
+      })
+      .then(({ v, committed }) => {
+        if (committed) {
+          if (beforeNotify) {
+            beforeNotify();
+          }
+          this.notify?.({ type: "write", key });
         }
-        this.notify?.({ type: "write", key });
-      }
-      return v;
-    });;
+        return v;
+      });
 
     return e.inFlight;
   }
-
 
   set(key: string, value: V, beforeNotify?: () => void): void {
     const e = this.entry(key);
@@ -223,13 +233,20 @@ export class SwrIdCache<T extends Identified> implements CacheHandle {
     return map;
   }
 
-  async fetch(fetchCall: () => Promise<T[]>, beforeNotify?: () => void): Promise<Map<UUID, T>> {
-    return this.inner.fetch(SwrIdCache.KEY, () => this.buildMap(fetchCall), () => {
-      if (beforeNotify) {
-        beforeNotify();
-      }
-      this.notify?.({ type: "write" });
-    });
+  async fetch(
+    fetchCall: () => Promise<T[]>,
+    beforeNotify?: () => void,
+  ): Promise<Map<UUID, T>> {
+    return this.inner.fetch(
+      SwrIdCache.KEY,
+      () => this.buildMap(fetchCall),
+      () => {
+        if (beforeNotify) {
+          beforeNotify();
+        }
+        this.notify?.({ type: "write" });
+      },
+    );
   }
 
   upsert(row: T, beforeNotify?: () => void): void {
@@ -292,17 +309,25 @@ class CacheFactory implements CacheHandle {
 
   subscribe(listener: CacheListener): () => void {
     this.listeners.add(listener);
-    console.debug(`New listener added. Total: ${this.listeners.size} listeners`);
+    console.debug(
+      `New listener added. Total: ${this.listeners.size} listeners`,
+    );
     return () => {
       this.listeners.delete(listener);
-      console.debug(`Listener removed. Total: ${this.listeners.size} listeners`);
+      console.debug(
+        `Listener removed. Total: ${this.listeners.size} listeners`,
+      );
     };
   }
 
   emit(e: CacheEvent): void {
     console.debug(`New emission to listeners: ${JSON.stringify(e)}`);
     for (const l of this.listeners) {
-      try { l(e); } catch (err) { console.error("cache listener failed", err); }
+      try {
+        l(e);
+      } catch (err) {
+        console.error("cache listener failed", err);
+      }
     }
   }
 
@@ -332,7 +357,9 @@ class CacheFactory implements CacheHandle {
     }
 
     this.registry.set(name, cache);
-    console.debug(`New cache added '${name}'. Total: ${this.registry.size} caches`);
+    console.debug(
+      `New cache added '${name}'. Total: ${this.registry.size} caches`,
+    );
     return cache;
   }
 
@@ -346,13 +373,17 @@ class CacheFactory implements CacheHandle {
       SwrIdCache<T>,
       () =>
         new SwrIdCache<T>(name, ttlMs, (evt) => {
-          if (evt.type === "clearAll") this.emit({ type: "clearAll", cacheName: name });
+          if (evt.type === "clearAll")
+            this.emit({ type: "clearAll", cacheName: name });
           else this.emit({ ...evt, cacheName: name } as CacheEvent);
         }),
     );
   }
 
-  getOrCreateSwrKeyedCache<V>(name: string, ttlMs: number | null): SwrKeyedCache<V> {
+  getOrCreateSwrKeyedCache<V>(
+    name: string,
+    ttlMs: number | null,
+  ): SwrKeyedCache<V> {
     // NOTE: pass the *class* SwrKeyedCache (no generics at runtime)
     return this.getOrCreate(
       name,
