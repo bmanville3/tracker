@@ -1,5 +1,5 @@
 import { FullAttachedWorkout, WorkoutEditorMode } from "@/src/api/workoutSharedApi";
-import { ExerciseMuscleRow, ExerciseRow, MUSCLE_GROUPS, MuscleGroup, UUID } from "@/src/types";
+import { ExerciseMuscleRow, ExerciseRow, MUSCLE_GROUPS, MuscleGroup, RPE, UUID } from "@/src/types";
 
 export function emptyMGRecord(): Record<MuscleGroup, number> {
   return MUSCLE_GROUPS.reduce<Record<MuscleGroup, number>>(
@@ -33,21 +33,30 @@ export function extractVolumes<M extends WorkoutEditorMode>(
     filterWarmups: boolean,
     mustBeGeEqThresh: number | null,
     disableFractionalVolume: boolean,
+    rpeMustMeetCriteria: RPE | null | 'no-track',
   }
 ) {
-  const { workoutsForMuscleVolume, exToMuscVolume, filterWarmups, mustBeGeEqThresh, disableFractionalVolume } = props;
+  const { workoutsForMuscleVolume, exToMuscVolume, filterWarmups, mustBeGeEqThresh, disableFractionalVolume, rpeMustMeetCriteria } = props;
   const totalVolume = emptyMGRecord();
   const newContributionRecord = emptyContributionRecord();
   const exercisesToSetCount: Map<UUID, [ExerciseRow, number]> = new Map();
   for (const w of workoutsForMuscleVolume) {
     for (const [i, ex] of w.exercises.entries()) {
-      let numSetsDone;
-      if (filterWarmups) {
-        numSetsDone =
-          w.sets[i]?.filter((s) => s.set_type !== "warmup").length ?? 0;
-      } else {
-        numSetsDone = w.sets[i]?.length ?? 0;
-      }
+      let numSetsDone = w.sets[i]?.filter(s => {
+        if (filterWarmups && s.set_type === 'warmup') {
+          return false;
+        }
+        if (rpeMustMeetCriteria === 'no-track') {
+          if (s.rpe === null) {
+            return false;
+          }
+        } else if (rpeMustMeetCriteria !== null) {
+          if (s.rpe === null || s.rpe < rpeMustMeetCriteria) {
+            return false;
+          }
+        }
+        return true;
+      }).length ?? 0;
       exercisesToSetCount.set(ex.exercise.id, [
         ex.exercise,
         (exercisesToSetCount.get(ex.exercise.id)?.[1] ?? 0) + numSetsDone,

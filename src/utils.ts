@@ -215,12 +215,39 @@ export function fromISODate(d: ISODate): Date {
   return new Date(year, month - 1, day);
 }
 
+/**
+ * Gets the number of days from date1 to date2.
+ * For example, if date1='2025-10-20' and date2='2025-10-21',
+ * then daysBetweenDates(date1, date2) = 1. 
+ * 
+ * It is assumed date1 <= date2. A negative number CAN be returned.
+ */
 export function daysBetweenDates(date1: ISODate, date2: ISODate): number {
   const d1 = new Date(date1 + "T00:00:00Z");
   const d2 = new Date(date2 + "T00:00:00Z");
 
-  const diffMs = Math.abs(d2.getTime() - d1.getTime());
+  const diffMs = d2.getTime() - d1.getTime();
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function addDays(date: Date, days: number): Date {
+  const newDate = new Date(date);
+  newDate.setDate(newDate.getDate() + days);
+  return newDate;
+}
+
+export function addDaysToIsoDate(date: ISODate, days: number): ISODate {
+  return toISODate(addDays(fromISODate(date), days));
+}
+
+export function generateDateRange(minDateInclusive: ISODate, maxDateInclusive: ISODate): ISODate[] {
+  const range = [];
+  let currDate = minDateInclusive;
+  while (currDate <= maxDateInclusive) {
+    range.push(currDate);
+    currDate = addDaysToIsoDate(currDate, 1);
+  }
+  return range;
 }
 
 export function arraysEqual<T>(
@@ -308,8 +335,8 @@ function hsvToRgb(h: number, s: number, v: number): {r: number, b: number, g: nu
 
 export function rgbColorGenerator(step: number, maxSteps: number): string {
   const h = (step % maxSteps) / maxSteps;
-  const s = 0.70;
-  const v = 0.95;
+  const s = 0.8;
+  const v = 0.825;
 
   const rgb = hsvToRgb(h, s, v);
   return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
@@ -323,4 +350,8 @@ export type AllOrNothing<T> = T | { [K in keyof T]: null };
 export function avg(nums: number[]): number | null {
   if (nums.length === 0) return null;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+export function isRealNumber(value: any): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }

@@ -14,9 +14,11 @@ import {
   MUSCLE_GROUPS,
   MuscleGroup,
   MuscleGroupRow,
+  RPE,
+  RPES,
   UUID
 } from "@/src/types";
-import { daysBetweenDates, requireGetUser } from "@/src/utils";
+import { daysBetweenDates, isRealNumber, requireGetUser } from "@/src/utils";
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -76,6 +78,7 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
   );
   const [filterWarmups, setFilterWarmups] = useState<boolean>(true);
   const [mustBeGeEqThresh, setMustBeGeEqThresh] = useState<number | null>(null);
+  const [rpeMustMeetCriteria, setRPEMustMeetCriteria] = useState<RPE | null | 'no-track'>(6);
   const [disableFractionalVolume, setDisableFractionalVolume] =
     useState<boolean>(false);
 
@@ -154,7 +157,8 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
         workoutsForMuscleVolume,
         filterWarmups,
         mustBeGeEqThresh,
-        disableFractionalVolume
+        disableFractionalVolume,
+        rpeMustMeetCriteria,
       });
       setExerciseContributionToVolume(newContributionRecord);
       setMuscleVolumes(totalVolume);
@@ -167,7 +171,8 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
     workoutsForMuscleVolume,
     filterWarmups,
     mustBeGeEqThresh,
-    disableFractionalVolume
+    disableFractionalVolume,
+    rpeMustMeetCriteria,
   ]);
 
   useEffect(() => {
@@ -311,6 +316,37 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
               }}
             />
           </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
+            }}
+          >
+            <Text style={typography.body}>RPE Filter:</Text>
+            <ModalPicker
+              title="Set RPE Filter"
+              help="A set must achieve at least this RPE to be tracked. If RPE is missing and there is an applied filter, the set is ignored."
+              options={[...RPES, null, 'no-track'].map((v) => {
+                return { label: v === null ? "No Filter" : v === 'no-track' ? 'Remove sets without an RPE' : `\u2265${v}`, value: v };
+              })}
+              value={rpeMustMeetCriteria}
+              onChange={(value) => {
+                if (value === null) {
+                  setRPEMustMeetCriteria(null);
+                } else if (value === 'no-track') {
+                  setRPEMustMeetCriteria('no-track');
+                } else if (isRealNumber(value) && RPES.includes(value)) {
+                  setRPEMustMeetCriteria(value);
+                } else {
+                  throw new Error(`Got value=${value}`);
+                }
+              }}
+              pressableProps={{
+                style: { alignSelf: "flex-start", padding: spacing.padding_sm },
+              }}
+            />
+          </View>
           <View style={{ rowGap: spacing.xs }}>
             <Text style={typography.label}>Defaults to Try:</Text>
             <View
@@ -326,13 +362,15 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
                   disableFractionalVolume === false &&
                   filterWarmups === true &&
                   showAsNDayAverage === null &&
-                  mustBeGeEqThresh === null
+                  mustBeGeEqThresh === null &&
+                  rpeMustMeetCriteria === 6
                 }
                 onPress={() => {
                   setDisableFractionalVolume(false);
                   setFilterWarmups(true);
                   setShowAsNDayAverage(null);
                   setMustBeGeEqThresh(null);
+                  setRPEMustMeetCriteria(6);
                 }}
               />
               <Selection
@@ -341,13 +379,15 @@ export function Volumes(props: VolumesProps<WorkoutEditorMode>) {
                   disableFractionalVolume === true &&
                   filterWarmups === true &&
                   showAsNDayAverage === null &&
-                  mustBeGeEqThresh === 0.5
+                  mustBeGeEqThresh === 0.5 &&
+                  rpeMustMeetCriteria === 6
                 }
                 onPress={() => {
                   setDisableFractionalVolume(true);
                   setFilterWarmups(true);
                   setShowAsNDayAverage(null);
                   setMustBeGeEqThresh(0.5);
+                  setRPEMustMeetCriteria(6);
                 }}
               />
             </View>

@@ -274,7 +274,10 @@ export default function WorkoutLogIndex() {
         <Button
           title={"Cancel Delete"}
           variant="primary"
-          onPress={() => setConfirmDelete(null)}
+          onPress={() => {
+            setConfirmDelete(null);
+            setConfirmDelete2(false);
+          }}
           disabled={loading}
         />
         <Button
@@ -290,6 +293,7 @@ export default function WorkoutLogIndex() {
           variant="revert"
           onPress={() => {
             if (confirmDelete === null) {
+              setConfirmDelete2(false);
               return;
             }
             setLoading(true);
